@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Lab Inventory">
@@ -27,7 +27,7 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      tailwindcss.config = {
+      tailwind.config = {
         theme: {
           extend: {
             fontFamily: {
@@ -39,78 +39,64 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
       }
     </script>
     <style>
-        * { -webkit-tap-highlight-color: transparent; }
-        body { overscroll-behavior: none; }
-        * { font-family: 'Inter', sans-serif; }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        body { overscroll-behavior: none; font-family: 'Inter', sans-serif; }
         .font-mono { font-family: 'JetBrains Mono', monospace !important; }
-        .theme-3dprint { background-color: #451a03; border-left: 4px solid #f59e0b; color: #fef3c7; }
-        .theme-electronics { background-color: #1e3a5f; border-left: 4px solid #3b82f6; color: #e0f2fe; }
-        .theme-mechanical { background-color: #1a3a2a; border-left: 4px solid #10b981; color: #d1fae5; }
-        .theme-other { background-color: #27272a; border-left: 4px solid #a1a1aa; color: #e4e4e7; }
-        .modal-overlay { display: flex; background: rgba(0,0,0,0.8); }
+
+        /* Category theme accents */
+        .theme-3dprint { background-color: rgba(245,158,11,0.08); border-left: 3px solid #f59e0b; }
+        .theme-electronics { background-color: rgba(59,130,246,0.08); border-left: 3px solid #3b82f6; }
+        .theme-mechanical { background-color: rgba(16,185,129,0.08); border-left: 3px solid #10b981; }
+        .theme-other { background-color: rgba(161,161,170,0.08); border-left: 3px solid #71717a; }
+
+        /* Modal overlay with backdrop blur */
+        .modal-overlay { display: flex; background: rgba(0,0,0,0.90); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+
         #qr-reader { width: 100%; max-width: 400px; margin: 0 auto; }
+
         @page { size: 40mm 30mm; margin: 0; }
         @media print {
             .no-print { display: none !important; }
             body { background: white !important; }
             .print-only { display: block !important; }
-            .qr-print-container {
-                display: flex !important;
-                flex-wrap: wrap;
-                gap: 0;
-                padding: 0;
-                margin: 0;
-            }
-            .qr-label {
-                width: 40mm;
-                height: 30mm;
-                border: 0.5px dashed #ccc;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                page-break-inside: avoid;
-                box-sizing: border-box;
-                padding: 2mm;
-            }
-            .qr-label-large {
-                width: 62mm;
-                height: 40mm;
-            }
-            .qr-label-small {
-                width: 38mm;
-                height: 21mm;
-            }
-            .qr-label .qr-code-img {
-                width: auto;
-                height: 60%;
-            }
-            .qr-label .label-text {
-                font-size: 10pt;
-                font-weight: bold;
-                margin-top: 1mm;
-                font-family: Arial, sans-serif;
-            }
-            .qr-label .label-desc {
-                font-size: 7pt;
-                color: #666;
-                text-align: center;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
-                max-width: 100%;
-            }
+            .qr-print-container { display: flex !important; flex-wrap: wrap; gap: 0; padding: 0; margin: 0; }
+            .qr-label { width: 40mm; height: 30mm; border: 0.5px dashed #ccc; display: flex; flex-direction: column; align-items: center; justify-content: center; page-break-inside: avoid; box-sizing: border-box; padding: 2mm; }
+            .qr-label-large { width: 62mm; height: 40mm; }
+            .qr-label-small { width: 38mm; height: 21mm; }
+            .qr-label .qr-code-img { width: auto; height: 60%; }
+            .qr-label .label-text { font-size: 10pt; font-weight: bold; margin-top: 1mm; font-family: Arial, sans-serif; }
+            .qr-label .label-desc { font-size: 7pt; color: #666; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
         }
         @media screen { .print-only { display: none; } }
+
         .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-        
+
         /* Global dark theme input/select styling */
-        input, select, textarea { background-color: #27272a !important; color: #f4f4f5 !important; border-color: #3f3f46 !important; }
-        input::placeholder, textarea::placeholder { color: #71717a !important; }
+        input, select, textarea {
+            background-color: #27272a !important;
+            color: #f4f4f5 !important;
+            border-color: #3f3f46 !important;
+            font-size: 14px;
+        }
+        input::placeholder, textarea::placeholder { color: #52525b !important; }
+        input:focus, select:focus, textarea:focus {
+            border-color: #f59e0b !important;
+            outline: none !important;
+            box-shadow: 0 0 0 2px rgba(245,158,11,0.2) !important;
+        }
+
+        /* Custom scrollbars */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #09090b; }
+        ::-webkit-scrollbar-track { background: #18181b; }
         ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+        /* Card hover animation */
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 30px -5px rgba(245,158,11,0.1); border-color: rgba(245,158,11,0.5) !important; }
+
+        /* Accent glow */
+        .glow-amber { box-shadow: 0 0 20px rgba(245,158,11,0.15); }
 
     </style>
 </head>
@@ -693,12 +679,17 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
 
             return (
                 <div className="fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 rounded-lg p-6 max-w-md w-full">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold">Scan Barcode</h3>
-                            <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200 text-2xl">&times;</button>
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-md w-full shadow-2xl">
+                        <div className="flex gap-1.5 mb-4">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
                         </div>
-                        {error ? <p className="text-red-500 text-center">{error}</p> : <div id="barcode-reader"></div>}
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-mono font-bold text-zinc-100">Scan Barcode</h3>
+                            <button onClick={onClose} className="text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-xl">&times;</button>
+                        </div>
+                        {error ? <p className="text-red-400 text-center font-mono text-sm">{error}</p> : <div id="barcode-reader"></div>}
                     </div>
                 </div>
             );
@@ -745,32 +736,37 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
 
             return (
                 <div className="fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 rounded-lg p-4 max-w-lg w-full max-h-screen overflow-y-auto">
-                        <div className="flex justify-between items-start mb-3">
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 max-w-lg w-full max-h-screen overflow-y-auto shadow-2xl">
+                        <div className="flex gap-1.5 mb-4">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <div className="flex justify-between items-start mb-4">
                             <div>
-                                <h3 className="text-xl font-bold">Print QR Labels</h3>
-                                <p className="text-zinc-400 text-sm">Prints via CUPS/system printer</p>
+                                <h3 className="text-xl font-mono font-bold text-zinc-100">Print QR Labels</h3>
+                                <p className="text-zinc-500 text-xs font-mono mt-1">Prints via CUPS/system printer</p>
                             </div>
-                            <button onClick={onClose} className="text-zinc-500 text-3xl leading-none">&times;</button>
+                            <button onClick={onClose} className="text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-xl">&times;</button>
                         </div>
 
                         <div className="space-y-4">
                             <div>
                                 <div className="flex justify-between items-center mb-2">
-                                    <label className="font-medium">Select Boxes ({selectedBoxes.length}/{boxes.length})</label>
+                                    <label className="font-mono text-sm text-zinc-300">Select Boxes <span className="text-amber-500">({selectedBoxes.length}/{boxes.length})</span></label>
                                     <div className="flex gap-2">
-                                        <button onClick={selectAll} className="text-sm text-amber-500">All</button>
-                                        <button onClick={selectNone} className="text-sm text-zinc-500">None</button>
+                                        <button onClick={selectAll} className="text-xs font-mono px-2 py-1 text-amber-500 hover:bg-amber-500/10 rounded transition-colors">All</button>
+                                        <button onClick={selectNone} className="text-xs font-mono px-2 py-1 text-zinc-500 hover:bg-zinc-800 rounded transition-colors">None</button>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-4 gap-1 max-h-40 overflow-y-auto border rounded p-2">
+                                <div className="grid grid-cols-4 gap-1.5 max-h-40 overflow-y-auto border border-zinc-700 rounded-lg p-2 bg-zinc-800">
                                     {boxes.map(box => (
-                                        <label key={box.label} className={`flex items-center gap-1 p-1 rounded text-sm cursor-pointer ${selectedBoxes.includes(box.label) ? 'bg-amber-500/20' : 'bg-zinc-800'}`}>
-                                            <input 
-                                                type="checkbox" 
+                                        <label key={box.label} className={`flex items-center gap-1.5 p-1.5 rounded-lg text-xs font-mono cursor-pointer transition-colors ${selectedBoxes.includes(box.label) ? 'bg-amber-500/20 text-amber-400' : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-700'}`}>
+                                            <input
+                                                type="checkbox"
                                                 checked={selectedBoxes.includes(box.label)}
                                                 onChange={() => toggleBox(box.label)}
-                                                className="w-4 h-4"
+                                                className="w-3.5 h-3.5"
                                             />
                                             {box.label}
                                         </label>
@@ -780,26 +776,26 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-sm text-zinc-400">Label Size</label>
-                                    <div className="px-3 py-2 border rounded-lg bg-zinc-800 text-zinc-200">40×30mm (PDF)</div>
+                                    <label className="text-xs text-zinc-500 font-mono mb-1 block">Label Size</label>
+                                    <div className="px-4 py-2.5 border border-zinc-700 rounded-lg bg-zinc-800 text-zinc-200 font-mono text-sm">40×30mm (PDF)</div>
                                 </div>
                                 <div>
-                                    <label className="text-sm text-zinc-400">Copies per label</label>
-                                    <input type="number" min="1" max="10" value={copies} onChange={e => setCopies(parseInt(e.target.value) || 1)} className="w-full px-3 py-2 border rounded-lg"/>
+                                    <label className="text-xs text-zinc-500 font-mono mb-1 block">Copies per label</label>
+                                    <input type="number" min="1" max="10" value={copies} onChange={e => setCopies(parseInt(e.target.value) || 1)} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm"/>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
+                            <label className="flex items-center gap-3 cursor-pointer p-2 rounded-lg hover:bg-zinc-800 transition-colors">
                                 <input type="checkbox" checked={includeContents} onChange={e => setIncludeContents(e.target.checked)} className="w-5 h-5"/>
-                                <label>Include box description</label>
-                            </div>
+                                <span className="text-sm text-zinc-300">Include box description</span>
+                            </label>
                         </div>
 
-                        <div className="flex gap-2 mt-4">
-                            <button onClick={handlePrint} className="flex-1 px-4 py-3 bg-amber-500 text-white rounded-lg text-lg flex items-center justify-center gap-2">
+                        <div className="flex gap-2 mt-5">
+                            <button onClick={handlePrint} className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg font-mono font-bold flex items-center justify-center gap-2 transition-colors">
                                 <span class="material-icons text-sm align-middle">print</span> Print Labels
                             </button>
-                            <button onClick={onClose} className="px-4 py-3 bg-zinc-600 rounded-lg text-lg">Cancel</button>
+                            <button onClick={onClose} className="px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg font-mono text-sm transition-colors">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -851,49 +847,53 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
 
             return (
                 <div className="fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 rounded-lg p-6 max-w-md w-full">
-                        <h3 className="text-lg font-bold mb-4">Instellingen</h3>
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-md w-full shadow-2xl">
+                        <div className="flex gap-1.5 mb-4">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <h3 className="text-lg font-mono font-bold text-zinc-100 mb-5">Instellingen</h3>
                         <div className="space-y-4">
-                            <hr className="my-2 border-zinc-700"/>
                             <div>
                                 <button
                                     onClick={handleSyncPhotos}
                                     disabled={syncStatus?.syncing}
-                                    className="w-full px-3 py-2 bg-green-500 text-white rounded flex items-center justify-center gap-2 hover:bg-green-600 disabled:bg-zinc-600"
+                                    className="w-full px-4 py-2.5 bg-green-600 hover:bg-green-500 text-white rounded-lg flex items-center justify-center gap-2 disabled:bg-zinc-700 disabled:text-zinc-500 font-mono text-sm transition-colors"
                                 >
                                     <span class="material-icons text-sm">{syncStatus?.syncing ? 'sync' : 'cloud_download'}</span>
                                     {syncStatus?.syncing ? `Syncing ${syncStatus.current}/${syncStatus.total}...` : 'Sync Photos from Links'}
                                 </button>
                                 {syncStatus && !syncStatus.syncing && (
-                                    <div className="mt-2 text-sm text-center">
+                                    <div className="mt-2 text-xs text-center font-mono">
                                         <span className="text-green-400">{syncStatus.success} downloaded</span>
-                                        {syncStatus.failed > 0 && <span className="text-red-500 ml-2">{syncStatus.failed} failed</span>}
+                                        {syncStatus.failed > 0 && <span className="text-red-400 ml-2">{syncStatus.failed} failed</span>}
                                         {syncStatus.skipped > 0 && <span className="text-zinc-500 ml-2">{syncStatus.skipped} skipped</span>}
                                     </div>
                                 )}
                             </div>
-                            <hr className="my-2 border-zinc-700"/>
-                            <button onClick={() => setShowChangePassword(!showChangePassword)} className="flex items-center gap-2 text-zinc-400 hover:text-amber-500">
+                            <hr className="border-zinc-800"/>
+                            <button onClick={() => setShowChangePassword(!showChangePassword)} className="flex items-center gap-2 text-zinc-400 hover:text-amber-400 font-mono text-sm transition-colors w-full py-1">
                                 <span class="material-icons text-sm">lock</span> Change Password
                             </button>
                             {showChangePassword && (
-                                <div className="bg-zinc-800 p-3 rounded space-y-2">
-                                    <input type="password" value={currentPw} onChange={e => setCurrentPw(e.target.value)} placeholder="Current password" className="w-full px-2 py-1.5 rounded text-sm border border-zinc-700" />
-                                    <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="New password" className="w-full px-2 py-1.5 rounded text-sm border border-zinc-700" />
-                                    <input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="w-full px-2 py-1.5 rounded text-sm border border-zinc-700" />
-                                    {pwMessage && <p className={`text-xs ${pwMessage.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{pwMessage.text}</p>}
-                                    <button onClick={handleChangePassword} className="w-full px-3 py-1.5 bg-amber-500 text-white rounded text-sm hover:bg-amber-600">Update Password</button>
+                                <div className="bg-zinc-800 border border-zinc-700 p-4 rounded-lg space-y-3">
+                                    <input type="password" value={currentPw} onChange={e => setCurrentPw(e.target.value)} placeholder="Current password" className="w-full px-4 py-2.5 rounded-lg text-sm border border-zinc-700" />
+                                    <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="New password" className="w-full px-4 py-2.5 rounded-lg text-sm border border-zinc-700" />
+                                    <input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="w-full px-4 py-2.5 rounded-lg text-sm border border-zinc-700" />
+                                    {pwMessage && <p className={`text-xs font-mono ${pwMessage.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{pwMessage.text}</p>}
+                                    <button onClick={handleChangePassword} className="w-full px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg text-sm font-mono font-bold transition-colors">Update Password</button>
                                 </div>
                             )}
-                            <hr className="my-2 border-zinc-700"/>
-                            <button onClick={() => setShowAbout(!showAbout)} className="flex items-center gap-2 text-zinc-400 hover:text-amber-500">
+                            <hr className="border-zinc-800"/>
+                            <button onClick={() => setShowAbout(!showAbout)} className="flex items-center gap-2 text-zinc-400 hover:text-amber-400 font-mono text-sm transition-colors w-full py-1">
                                 <span class="material-icons text-sm">info</span> About
                             </button>
                             {showAbout && (
-                                <div className="bg-zinc-800 p-3 rounded text-sm">
-                                    <div className="font-bold mb-2">Electronics Lab Inventory</div>
-                                    <div className="text-zinc-400">Build: {GIT_HASH}</div>
-                                    <div className="text-zinc-400">Date: {BUILD_DATE}</div>
+                                <div className="bg-zinc-800 border border-zinc-700 p-4 rounded-lg text-sm">
+                                    <div className="font-mono font-bold mb-2 text-zinc-100">Electronics Lab Inventory</div>
+                                    <div className="text-zinc-500 font-mono text-xs">Build: <span className="text-amber-500">{GIT_HASH}</span></div>
+                                    <div className="text-zinc-500 font-mono text-xs">Date: <span className="text-zinc-300">{BUILD_DATE}</span></div>
                                     <div className="text-zinc-500 mt-2 text-xs">A PWA for managing lab components and boxes with barcode support.</div>
                                     <details className="mt-3">
                                         <summary className="cursor-pointer text-amber-500 hover:text-amber-600 font-medium">Version History</summary>
@@ -913,7 +913,6 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                     <button
                                         onClick={async () => {
                                             if (confirm('Check for updates and reload?')) {
-                                                // Unregister service worker and clear caches
                                                 if ('serviceWorker' in navigator) {
                                                     const registrations = await navigator.serviceWorker.getRegistrations();
                                                     for (const registration of registrations) {
@@ -926,20 +925,19 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                                         await caches.delete(name);
                                                     }
                                                 }
-                                                // Force reload from server
                                                 window.location.reload(true);
                                             }
                                         }}
-                                        className="mt-3 w-full px-3 py-2 bg-amber-500 text-white rounded flex items-center justify-center gap-2 hover:bg-amber-600"
+                                        className="mt-3 w-full px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg flex items-center justify-center gap-2 font-mono font-bold text-sm transition-colors"
                                     >
                                         <span class="material-icons text-sm">refresh</span> Check for Updates
                                     </button>
                                 </div>
                             )}
                         </div>
-                        <div className="flex gap-2 mt-4">
-                            <button onClick={() => onSave(form)} className="flex-1 px-4 py-3 bg-amber-500 text-white rounded-lg text-lg">Opslaan</button>
-                            <button onClick={onClose} className="px-4 py-3 bg-zinc-600 rounded-lg text-lg">Annuleren</button>
+                        <div className="flex gap-2 mt-5">
+                            <button onClick={() => onSave(form)} className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg font-mono font-bold transition-colors">Opslaan</button>
+                            <button onClick={onClose} className="px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg font-mono text-sm transition-colors">Annuleren</button>
                         </div>
                     </div>
                 </div>
@@ -1049,38 +1047,44 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             
             return (
                 <div className="fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 rounded-lg p-6 max-w-md w-full max-h-screen overflow-y-auto">
-                        <h3 className="text-lg font-bold mb-4">{item ? 'Edit Item' : 'Nieuw Item'}</h3>
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-lg w-full max-h-screen overflow-y-auto shadow-2xl">
+                        <div className="flex gap-1.5 mb-4">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <h3 className="text-lg font-mono font-bold text-zinc-100 mb-4">{item ? 'Edit Item' : 'Nieuw Item'}</h3>
                         <div className="space-y-3">
                             {/* Photo section */}
                             <div className="flex flex-col items-center gap-2">
                                 {photoPreview ? (
                                     <div className="relative">
-                                        <img src={photoPreview} alt="Item" className="w-32 h-32 object-cover rounded-lg border"/>
-                                        <button onClick={handleDeletePhoto} className="absolute -top-2 -right-2 w-6 h-6 bg-red-500/100 text-white rounded-full text-sm">×</button>
+                                        <img src={photoPreview} alt="Item" className="w-28 h-28 object-cover rounded-lg border border-zinc-700"/>
+                                        <button onClick={handleDeletePhoto} className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">×</button>
                                     </div>
                                 ) : (
-                                    <div 
+                                    <div
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="w-32 h-32 border-2 border-dashed border-zinc-600 rounded-lg flex items-center justify-center cursor-pointer hover:border-amber-400"
+                                        className="w-28 h-28 border-2 border-dashed border-zinc-700 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-amber-500/50 transition-colors bg-zinc-800/50"
                                     >
-                                        <span className="text-zinc-500 text-center text-sm">📷 Add Photo</span>
+                                        <span className="material-icons text-zinc-600" style={{fontSize:'24px'}}>add_a_photo</span>
+                                        <span className="text-zinc-600 text-xs font-mono mt-1">Add Photo</span>
                                     </div>
                                 )}
                                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handlePhotoChange} className="hidden"/>
-                                {photoPreview && <button onClick={() => fileInputRef.current?.click()} className="text-sm text-amber-500">Change Photo</button>}
+                                {photoPreview && <button onClick={() => fileInputRef.current?.click()} className="text-xs text-amber-500 hover:text-amber-400 font-mono transition-colors">Change Photo</button>}
                             </div>
-                            
-                            <input placeholder="Item naam" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-3 py-3 border rounded-lg text-lg"/>
+
+                            <input placeholder="Item naam" value={form.name} onChange={e => setForm({...form, name: e.target.value})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm"/>
                             <div>
-                                <label className="text-sm text-zinc-500">12NC Code</label>
+                                <label className="text-xs text-zinc-500 font-mono">12NC Code</label>
                                 <div className="flex gap-3 items-start">
                                     <div className="flex-1">
-                                        <input placeholder="4822 000 00001" value={form.nc || ''} onChange={e => setForm({...form, nc: e.target.value})} className="w-full px-3 py-3 border rounded-lg font-mono text-lg bg-zinc-800"/>
+                                        <input placeholder="4822 000 00001" value={form.nc || ''} onChange={e => setForm({...form, nc: e.target.value})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm bg-zinc-800"/>
                                     </div>
                                     {form.nc && (
                                         <div className="flex flex-col items-center">
-                                            <QRCode value={(form.nc || '').replace(/ /g, '')} size={80} />
+                                            <QRCode value={(form.nc || '').replace(/ /g, '')} size={70} />
                                             <button
                                                 type="button"
                                                 onClick={(e) => {
@@ -1089,38 +1093,40 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                                     const imageDataUrl = LabelImage.generateItemLabel(nc, form.nc, form.name);
                                                     LabelImage.print(imageDataUrl);
                                                 }}
-                                                className="text-xs text-amber-500 mt-1 hover:underline"
+                                                className="text-xs text-amber-500 hover:text-amber-400 mt-1 font-mono transition-colors"
                                             ><span class="material-icons text-sm align-middle">print</span> Print</button>
                                         </div>
                                     )}
                                 </div>
                             </div>
-                            <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full px-3 py-3 border rounded-lg text-lg">
+                            <select value={form.category} onChange={e => setForm({...form, category: e.target.value})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm bg-zinc-800">
                                 <option>Electronics</option><option>3D Printing</option><option>Mechanical</option><option>Other</option>
                             </select>
-                            <input placeholder="Subcategorie (bijv. Sensors, Connectors)" value={form.subcategory || ''} onChange={e => setForm({...form, subcategory: e.target.value})} className="w-full px-3 py-3 border rounded-lg text-lg"/>
-                            <select value={form.box} onChange={e => setForm({...form, box: e.target.value})} className="w-full px-3 py-3 border rounded-lg text-lg">
+                            <input placeholder="Subcategorie (bijv. Sensors, Connectors)" value={form.subcategory || ''} onChange={e => setForm({...form, subcategory: e.target.value})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm"/>
+                            <select value={form.box} onChange={e => setForm({...form, box: e.target.value})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm bg-zinc-800">
                                 {boxes.map(b => <option key={b.label} value={b.label}>{b.label} - {b.contents}</option>)}
                             </select>
-                            <div>
-                                <label className="text-sm text-zinc-500">Aantal</label>
-                                <input type="number" value={form.quantity} onChange={e => setForm({...form, quantity: parseInt(e.target.value)||0})} className="w-full px-3 py-3 border rounded-lg text-lg"/>
-                            </div>
-                            <div>
-                                <label className="text-sm text-zinc-500">Waarde (€ per stuk)</label>
-                                <input type="number" step="0.01" min="0" value={form.value || 0} onChange={e => setForm({...form, value: parseFloat(e.target.value)||0})} className="w-full px-3 py-3 border rounded-lg text-lg"/>
-                            </div>
-                            <div>
-                                <label className="text-sm text-zinc-500">Product link (AliExpress, etc.)</label>
-                                <div className="flex gap-2">
-                                    <input placeholder="https://..." value={form.link || ''} onChange={e => setForm({...form, link: e.target.value})} className="flex-1 px-3 py-2 border rounded-lg text-sm"/>
-                                    {form.link && <a href={form.link.startsWith('http') ? form.link : `https:${form.link}`} target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-amber-500 text-white rounded-lg text-sm">🔗</a>}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs text-zinc-500 font-mono mb-1 block">Aantal</label>
+                                    <input type="number" value={form.quantity} onChange={e => setForm({...form, quantity: parseInt(e.target.value)||0})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm"/>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-zinc-500 font-mono mb-1 block">Waarde (€/stuk)</label>
+                                    <input type="number" step="0.01" min="0" value={form.value || 0} onChange={e => setForm({...form, value: parseFloat(e.target.value)||0})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm"/>
                                 </div>
                             </div>
                             <div>
-                                <label className="text-sm text-zinc-500">Product afbeelding URL</label>
+                                <label className="text-xs text-zinc-500 font-mono mb-1 block">Product link</label>
+                                <div className="flex gap-2">
+                                    <input placeholder="https://..." value={form.link || ''} onChange={e => setForm({...form, link: e.target.value})} className="flex-1 px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm"/>
+                                    {form.link && <a href={form.link.startsWith('http') ? form.link : `https:${form.link}`} target="_blank" rel="noopener noreferrer" className="px-3 py-2.5 bg-amber-500/10 text-amber-400 rounded-lg text-sm hover:bg-amber-500/20 transition-colors flex items-center"><span className="material-icons" style={{fontSize:'16px'}}>link</span></a>}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs text-zinc-500 font-mono mb-1 block">Product afbeelding URL</label>
                                 <div className="flex gap-2 items-start">
-                                    <input placeholder="https://..." value={form.image || ''} onChange={e => setForm({...form, image: e.target.value})} className="flex-1 px-3 py-2 border rounded-lg text-sm"/>
+                                    <input placeholder="https://..." value={form.image || ''} onChange={e => setForm({...form, image: e.target.value})} className="flex-1 px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm"/>
                                     {form.image && (
                                         <button
                                             type="button"
@@ -1201,46 +1207,45 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                 </div>
                             </div>
                             <div>
-                                <label className="text-sm text-zinc-500">Projecten</label>
-                                <div className="space-y-2 mt-1">
+                                <label className="text-xs text-zinc-500 font-mono mb-1 block">Projecten</label>
+                                <div className="space-y-1.5 mt-1">
                                     {(form.projects || []).map((p, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 bg-zinc-800 p-2 rounded">
-                                            <span className="flex-1 font-medium truncate">{p.name}</span>
+                                        <div key={idx} className="flex items-center gap-2 bg-zinc-800 border border-zinc-700 p-2 rounded-lg">
+                                            <span className="flex-1 font-mono text-sm text-zinc-200 truncate">{p.name}</span>
                                             <div className="flex items-center gap-1">
                                                 <button type="button" onClick={() => {
                                                     if (p.quantity > 1) {
                                                         setForm({...form, projects: form.projects.map((proj, i) => i === idx ? {...proj, quantity: proj.quantity - 1} : proj)});
                                                     }
-                                                }} className="w-7 h-7 bg-red-500/20 rounded text-lg leading-none">-</button>
-                                                <input 
-                                                    type="number" 
+                                                }} className="w-7 h-7 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-sm transition-colors">-</button>
+                                                <input
+                                                    type="number"
                                                     min="1"
                                                     value={p.quantity}
                                                     onChange={e => setForm({...form, projects: form.projects.map((proj, i) => i === idx ? {...proj, quantity: Math.max(1, parseInt(e.target.value)||1)} : proj)})}
-                                                    className="w-12 px-1 py-1 border rounded text-sm text-center"
+                                                    className="w-10 px-1 py-1 border border-zinc-700 rounded-lg text-xs text-center font-mono"
                                                 />
                                                 <button type="button" onClick={() => {
                                                     setForm({...form, projects: form.projects.map((proj, i) => i === idx ? {...proj, quantity: proj.quantity + 1} : proj)});
-                                                }} className="w-7 h-7 bg-green-500/20 rounded text-lg leading-none">+</button>
+                                                }} className="w-7 h-7 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg text-sm transition-colors">+</button>
                                             </div>
-                                            <button type="button" onClick={() => setForm({...form, projects: form.projects.filter((_, i) => i !== idx)})} className="text-red-500 text-lg ml-1">×</button>
+                                            <button type="button" onClick={() => setForm({...form, projects: form.projects.filter((_, i) => i !== idx)})} className="text-red-400 hover:text-red-300 text-sm ml-1 transition-colors">×</button>
                                         </div>
                                     ))}
                                     <div className="flex gap-2 items-center">
                                         {!isNewProject ? (
-                                            <select 
+                                            <select
                                                 value={newProject.name}
                                                 onChange={e => {
                                                     if (e.target.value === '__new__') {
                                                         setIsNewProject(true);
                                                         setNewProject({name: '', quantity: 1});
                                                     } else if (e.target.value) {
-                                                        // Auto-add project when selected
                                                         const projectName = e.target.value;
                                                         setForm({...form, projects: [...(form.projects || []), {name: projectName, quantity: 1}]});
                                                     }
                                                 }}
-                                                className="flex-1 px-2 py-2 border rounded text-sm"
+                                                className="flex-1 px-3 py-2 border border-zinc-700 rounded-lg text-xs font-mono bg-zinc-800"
                                             >
                                                 <option value="">-- Voeg project toe --</option>
                                                 {existingProjects.filter(p => !(form.projects || []).find(fp => fp.name === p)).map(p => (
@@ -1250,11 +1255,11 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                             </select>
                                         ) : (
                                             <div className="flex-1 flex gap-1">
-                                                <input 
-                                                    placeholder="Nieuw project naam" 
-                                                    value={newProject.name} 
-                                                    onChange={e => setNewProject({...newProject, name: e.target.value})} 
-                                                    className="flex-1 px-2 py-2 border rounded text-sm"
+                                                <input
+                                                    placeholder="Nieuw project naam"
+                                                    value={newProject.name}
+                                                    onChange={e => setNewProject({...newProject, name: e.target.value})}
+                                                    className="flex-1 px-3 py-2 border border-zinc-700 rounded-lg text-xs font-mono"
                                                     autoFocus
                                                     onKeyDown={e => {
                                                         if (e.key === 'Enter' && newProject.name.trim()) {
@@ -1270,18 +1275,18 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                                     }
                                                     setNewProject({name: '', quantity: 1});
                                                     setIsNewProject(false);
-                                                }} className="px-2 py-1 bg-amber-500 text-white rounded text-sm">OK</button>
-                                                <button type="button" onClick={() => { setIsNewProject(false); setNewProject({name: '', quantity: 1}); }} className="px-2 text-zinc-500">✕</button>
+                                                }} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg text-xs font-mono font-bold transition-colors">OK</button>
+                                                <button type="button" onClick={() => { setIsNewProject(false); setNewProject({name: '', quantity: 1}); }} className="px-2 text-zinc-500 hover:text-zinc-300 transition-colors">✕</button>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div className="flex gap-2 mt-4">
-                            <button onClick={handleSave} className="flex-1 px-4 py-3 bg-amber-500 text-white rounded-lg text-lg">Opslaan</button>
-                            {item && <button onClick={() => onDelete(item.id)} className="px-4 py-3 bg-red-500/100 text-white rounded-lg text-lg">Verwijder</button>}
-                            <button onClick={onClose} className="px-4 py-3 bg-zinc-600 rounded-lg text-lg">Annuleer</button>
+                        <div className="flex gap-2 mt-5">
+                            <button onClick={handleSave} className="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg font-mono font-bold transition-colors">Opslaan</button>
+                            {item && <button onClick={() => onDelete(item.id)} className="px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg font-mono text-sm transition-colors">Verwijder</button>}
+                            <button onClick={onClose} className="px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg font-mono text-sm transition-colors">Annuleer</button>
                         </div>
                     </div>
                 </div>
@@ -1296,28 +1301,33 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             };
             return (
                 <div className="fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 rounded-lg p-4 max-w-lg w-full max-h-screen overflow-y-auto">
-                        <div className="flex justify-between items-start mb-3">
-                            <div>
-                                <h3 className="text-xl font-bold">{box.label}</h3>
-                                <p className="text-zinc-400 text-sm">{box.contents}</p>
-                                <p className="text-xs text-zinc-500">{box.location}</p>
-                                {box.type && <p className="text-xs text-amber-500">{box.type}</p>}
-                            </div>
-                            <button onClick={onClose} className="text-zinc-500 text-3xl leading-none">&times;</button>
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 max-w-lg w-full max-h-screen overflow-y-auto shadow-2xl">
+                        <div className="flex gap-1.5 mb-4">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
                         </div>
-                        <div className="flex flex-col items-center mb-3"><QRCode value={`INVBOX:${box.label}`} size={100} /><button onClick={() => onPrintQR(box)} className="mt-2 px-3 py-1 bg-amber-500 text-white rounded text-sm"><span class="material-icons text-sm align-middle">print</span> Print QR</button></div>
-                        <h4 className="font-bold mb-2">{boxItems.length} items</h4>
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 className="text-xl font-mono font-bold text-amber-500">{box.label}</h3>
+                                <p className="text-zinc-300 text-sm mt-1">{box.contents}</p>
+                                <p className="text-xs text-zinc-500 font-mono">{box.location}</p>
+                                {box.type && <span className="text-xs px-2 py-0.5 bg-amber-500/10 text-amber-400 rounded font-mono mt-1 inline-block">{box.type}</span>}
+                            </div>
+                            <button onClick={onClose} className="text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 w-8 h-8 flex items-center justify-center rounded-lg transition-colors text-xl">&times;</button>
+                        </div>
+                        <div className="flex flex-col items-center mb-4 p-3 bg-zinc-800 rounded-lg border border-zinc-700"><QRCode value={`INVBOX:${box.label}`} size={100} /><button onClick={() => onPrintQR(box)} className="mt-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg text-xs font-mono font-bold transition-colors"><span class="material-icons text-sm align-middle">print</span> Print QR</button></div>
+                        <h4 className="font-mono font-bold text-zinc-100 mb-3 text-sm">{boxItems.length} items</h4>
+                        <div className="space-y-1.5 max-h-64 overflow-y-auto">
                             {boxItems.map(item => (
-                                <div key={item.id} className={`flex items-center justify-between p-2 rounded-lg ${isOverallocated(item) ? 'bg-red-500/10' : 'bg-zinc-800'}`}>
-                                    <div className="flex-1 min-w-0 pr-2" onClick={() => onEditItem(item)}>
-                                        <div className="font-medium truncate">{item.name}</div>
+                                <div key={item.id} className={`flex items-center justify-between p-2.5 rounded-lg transition-colors ${isOverallocated(item) ? 'bg-red-500/10 border border-red-500/20' : 'bg-zinc-800 border border-zinc-700 hover:border-amber-500/30'}`}>
+                                    <div className="flex-1 min-w-0 pr-2 cursor-pointer" onClick={() => onEditItem(item)}>
+                                        <div className="text-sm text-zinc-200 truncate">{item.name}</div>
                                     </div>
                                     <div className="flex items-center gap-1 flex-shrink-0">
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); onUpdateItem(item.id, -1); }} className="w-10 h-10 bg-red-500/20 rounded-lg text-xl">-</button>
-                                        <span className="w-10 text-center font-mono">{item.quantity}</span>
-                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); onUpdateItem(item.id, 1); }} className="w-10 h-10 bg-green-500/20 rounded-lg text-xl">+</button>
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); onUpdateItem(item.id, -1); }} className="w-9 h-9 bg-red-500/20 hover:bg-red-500/30 rounded-lg text-red-400 text-lg transition-colors">-</button>
+                                        <span className="w-9 text-center font-mono text-sm text-zinc-100">{item.quantity}</span>
+                                        <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); onUpdateItem(item.id, 1); }} className="w-9 h-9 bg-green-500/20 hover:bg-green-500/30 rounded-lg text-green-400 text-lg transition-colors">+</button>
                                     </div>
                                 </div>
                             ))}
@@ -1360,22 +1370,27 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             };
             return (
                 <div className="fixed inset-0 modal-overlay flex items-center justify-center z-50 p-4">
-                    <div className="bg-zinc-900 rounded-lg p-6 max-w-md w-full max-h-screen overflow-y-auto">
-                        <h3 className="text-lg font-bold mb-4">Nieuwe Box</h3>
-                        <div className="space-y-3">
+                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 max-w-md w-full max-h-screen overflow-y-auto shadow-2xl">
+                        <div className="flex gap-1.5 mb-4">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <h3 className="text-lg font-mono font-bold text-zinc-100 mb-5">Nieuwe Box</h3>
+                        <div className="space-y-4">
                             <div>
-                                <label className="text-sm text-zinc-400">Box Type</label>
-                                <select value={form.label.split('-')[0]} onChange={e => updatePrefix(e.target.value)} className="w-full px-3 py-3 border rounded-lg text-lg">
+                                <label className="text-xs text-zinc-500 font-mono mb-1 block">Box Type</label>
+                                <select value={form.label.split('-')[0]} onChange={e => updatePrefix(e.target.value)} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg bg-zinc-800 font-mono text-sm">
                                     {prefixOptions.map(opt => <option key={opt.prefix} value={opt.prefix}>{opt.prefix} - {opt.type}</option>)}
                                 </select>
                             </div>
                             <div>
-                                <label className="text-sm text-zinc-400">Label</label>
-                                <input value={form.label} onChange={e => setForm({...form, label: e.target.value})} className="w-full px-3 py-3 border rounded-lg text-lg" placeholder="KS-12"/>
+                                <label className="text-xs text-zinc-500 font-mono mb-1 block">Label</label>
+                                <input value={form.label} onChange={e => setForm({...form, label: e.target.value})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm" placeholder="KS-12"/>
                             </div>
                             <div>
-                                <label className="text-sm text-zinc-400">Thema</label>
-                                <select value={form.theme} onChange={e => setForm({...form, theme: e.target.value})} className="w-full px-3 py-3 border rounded-lg text-lg">
+                                <label className="text-xs text-zinc-500 font-mono mb-1 block">Thema</label>
+                                <select value={form.theme} onChange={e => setForm({...form, theme: e.target.value})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg bg-zinc-800 font-mono text-sm">
                                     <option value="Electronics">Electronics</option>
                                     <option value="3D Printing">3D Printing</option>
                                     <option value="Mechanical">Mechanical</option>
@@ -1383,18 +1398,17 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                 </select>
                             </div>
                             <div>
-                                <label className="text-sm text-zinc-400">Locatie</label>
-                                <input placeholder="Blok 1 Lade A" value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="w-full px-3 py-3 border rounded-lg text-lg"/>
+                                <label className="text-xs text-zinc-500 font-mono mb-1 block">Locatie</label>
+                                <input placeholder="Blok 1 Lade A" value={form.location} onChange={e => setForm({...form, location: e.target.value})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm"/>
                             </div>
                             <div>
-                                <label className="text-sm text-zinc-400">Inhoud beschrijving</label>
-                                <input placeholder="Components, tools..." value={form.contents} onChange={e => setForm({...form, contents: e.target.value})} className="w-full px-3 py-3 border rounded-lg text-lg"/>
+                                <label className="text-xs text-zinc-500 font-mono mb-1 block">Inhoud beschrijving</label>
+                                <input placeholder="Components, tools..." value={form.contents} onChange={e => setForm({...form, contents: e.target.value})} className="w-full px-4 py-2.5 border border-zinc-700 rounded-lg font-mono text-sm"/>
                             </div>
                         </div>
-                        <div className="flex gap-2 mt-4">
-                            <button onClick={() => { 
+                        <div className="flex gap-2 mt-5">
+                            <button onClick={() => {
                                 if(form.label && form.contents) {
-                                    // Sanitize inputs before saving (OWASP recommendation)
                                     onSave({
                                         ...form,
                                         label: sanitizeInput(form.label),
@@ -1402,8 +1416,8 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                         location: sanitizeInput(form.location),
                                     });
                                 }
-                            }} className="flex-1 py-3 bg-amber-500 text-white rounded-lg text-lg">Opslaan</button>
-                            <button onClick={onClose} className="px-4 py-3 bg-zinc-600 rounded-lg text-lg">Annuleer</button>
+                            }} className="flex-1 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg font-mono font-bold transition-colors">Opslaan</button>
+                            <button onClick={onClose} className="px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg font-mono text-sm transition-colors">Annuleer</button>
                         </div>
                     </div>
                 </div>
@@ -2019,89 +2033,106 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             // Calculate total inventory value
             const totalInventoryValue = useMemo(() => items.reduce((sum, item) => sum + (item.value || 0) * item.quantity, 0), [items]);
 
-            if (loading) return <div className="flex items-center justify-center h-screen"><div className="text-xl">Loading...</div></div>;
+            if (loading) return <div className="flex items-center justify-center h-screen bg-zinc-950"><div className="text-center"><span className="material-icons text-amber-500 mb-3" style={{fontSize:'48px'}}>inventory_2</span><div className="font-mono text-zinc-400 text-sm">Loading...</div></div></div>;
 
             return (
-                <div className="container mx-auto p-3 max-w-4xl">
-                    {updateAvailable && (
-                        <button
-                            onClick={performUpdate}
-                            className="w-full mb-3 p-3 bg-amber-600 hover:bg-amber-600 text-white rounded-xl shadow flex items-center justify-center gap-2 transition"
-                        >
-                            <span className="material-icons">system_update</span>
-                            <span className="font-medium">New version available - Click to update</span>
-                        </button>
-                    )}
-                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow p-4 mb-3">
+                <div className="max-w-7xl mx-auto px-4 pb-4">
+                    {/* Sticky Header */}
+                    <div className="sticky top-0 z-40 bg-zinc-950/80 backdrop-blur-md border-b border-zinc-800 -mx-4 px-4 pt-3 pb-3 mb-4">
+                        {updateAvailable && (
+                            <button
+                                onClick={performUpdate}
+                                className="w-full mb-3 px-4 py-2.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 border border-amber-500/30 rounded-lg flex items-center justify-center gap-2 transition-colors font-mono text-sm"
+                            >
+                                <span className="material-icons text-sm">system_update</span>
+                                <span className="font-bold">New version available - Click to update</span>
+                            </button>
+                        )}
                         <div className="flex items-center justify-between">
                             <div>
-                                <h1 className="text-xl font-mono font-bold text-zinc-100"><span className="text-amber-500">$</span> lab_inventory</h1>
-                                <p className="text-xs text-zinc-500 font-mono"><span className="text-green-400">→</span> {items.length} items • {items.reduce((s,i)=>s+i.quantity,0)} stuks</p>
+                                <h1 className="text-xl font-mono font-bold text-amber-500">$ <span className="text-zinc-100">lab_inventory</span></h1>
+                                <p className="text-xs text-zinc-500 font-mono mt-0.5"><span className="text-green-400">→</span> {items.length} items • {items.reduce((s,i)=>s+i.quantity,0)} stuks</p>
                             </div>
-                            <div className="flex gap-2">
-                                <button onClick={() => setShowScanner(true)} className="p-2 bg-purple-500 text-white rounded-lg text-lg" title="Scan QR"><span class="material-icons">qr_code_scanner</span></button>
-                                <button onClick={() => setShowAddBox(true)} className="p-2 bg-yellow-500 text-white rounded-lg text-lg" title="Nieuwe box"><span class="material-icons">add_box</span></button>
-                                <button onClick={() => setShowPrintQR(true)} className="p-2 bg-indigo-500 text-white rounded-lg text-lg" title="Print labels"><span class="material-icons">print</span></button>
-                                <button onClick={() => setShowAddItem(true)} className="p-2 bg-green-500 text-white rounded-lg text-lg" title="Nieuw item"><span class="material-icons">add_circle</span></button>
-                                <button onClick={() => setShowSettings(true)} className="p-2 bg-zinc-700 rounded-lg text-lg" title="Instellingen"><span class="material-icons">settings</span></button>
+                            <div className="flex gap-1.5">
+                                <button onClick={() => setShowScanner(true)} className="p-2 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors" title="Scan QR"><span class="material-icons" style={{fontSize:'20px'}}>qr_code_scanner</span></button>
+                                <button onClick={() => setShowAddBox(true)} className="p-2 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors" title="Nieuwe box"><span class="material-icons" style={{fontSize:'20px'}}>add_box</span></button>
+                                <button onClick={() => setShowPrintQR(true)} className="p-2 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors" title="Print labels"><span class="material-icons" style={{fontSize:'20px'}}>print</span></button>
+                                <button onClick={() => setShowAddItem(true)} className="p-2 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg transition-colors" title="Nieuw item"><span class="material-icons" style={{fontSize:'20px'}}>add_circle</span></button>
+                                <button onClick={() => setShowSettings(true)} className="p-2 text-zinc-400 hover:text-amber-400 hover:bg-zinc-800 rounded-lg transition-colors" title="Instellingen"><span class="material-icons" style={{fontSize:'20px'}}>settings</span></button>
                             </div>
                         </div>
                     </div>
 
                     {overallocatedItems.length > 0 && (
-                        <div className="bg-red-500/20 border-l-4 border-red-500 p-3 mb-3 rounded-lg">
-                            <div className="font-bold text-red-400 text-sm">⚠️ Overallocated: {overallocatedItems.length} items have more allocated to projects than available</div>
+                        <div className="bg-red-500/10 border border-red-500/30 p-3 mb-4 rounded-lg flex items-center gap-2">
+                            <span className="material-icons text-red-400" style={{fontSize:'18px'}}>warning</span>
+                            <div className="font-mono text-red-400 text-xs"><span className="font-bold">Overallocated:</span> {overallocatedItems.length} items have more allocated to projects than available</div>
                         </div>
                     )}
 
-                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow p-3 mb-3">
-                        <div className="flex gap-2 mb-2">
-                            <input type="text" placeholder="🔍 Zoeken..." value={search} onChange={e => setSearch(e.target.value)} className="flex-1 px-3 py-2 border rounded-lg"/>
-                            {search && <button onClick={() => setSearch('')} className="px-3 py-2 bg-zinc-700 rounded-lg text-sm">Wis</button>}
-                            <select value={filterTheme} onChange={e => setFilterTheme(e.target.value)} className="px-2 py-2 border rounded-lg text-sm">
-                                <option value="all">Alles</option><option value="Electronics">Elec</option><option value="3D Printing">3DP</option><option value="Mechanical">Mech</option>
-                            </select>
+                    {/* Search & Filter Bar */}
+                    <div className="flex gap-2 mb-3">
+                        <div className="flex-1 relative">
+                            <span className="material-icons absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600" style={{fontSize:'18px'}}>search</span>
+                            <input type="text" placeholder="Zoeken..." value={search} onChange={e => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg font-mono text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-amber-500 focus:outline-none"/>
                         </div>
-                        <div className="flex rounded-lg overflow-hidden border border-zinc-700 text-xs font-mono">
-                            <button onClick={() => setView('shelves')} className={`flex-1 py-2 ${view === 'shelves' ? 'bg-amber-500 text-zinc-900 shadow-lg shadow-amber-500/20' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'}`}>🗄️ Locaties</button>
-                            <button onClick={() => setView('items')} className={`flex-1 py-2 ${view === 'items' ? 'bg-amber-500 text-zinc-900 shadow-lg shadow-amber-500/20' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'}`}>📋 Items</button>
-                            <button onClick={() => setView('projects')} className={`flex-1 py-2 ${view === 'projects' ? 'bg-amber-500 text-zinc-900 shadow-lg shadow-amber-500/20' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'}`}>🔧 BoM</button>
-                            <button onClick={() => setView('map')} className={`flex-1 py-2 ${view === 'map' ? 'bg-amber-500 text-zinc-900 shadow-lg shadow-amber-500/20' : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200'}`}>🗺️</button>
-                        </div>
+                        {search && <button onClick={() => setSearch('')} className="px-3 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-400 rounded-lg text-xs font-mono transition-colors">Clear</button>}
+                        <select value={filterTheme} onChange={e => setFilterTheme(e.target.value)} className="px-3 py-2.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs font-mono text-zinc-300">
+                            <option value="all">Alles</option><option value="Electronics">Elec</option><option value="3D Printing">3DP</option><option value="Mechanical">Mech</option>
+                        </select>
+                    </div>
+
+                    {/* Navigation Tabs */}
+                    <div className="flex gap-1 mb-5 bg-zinc-900 border border-zinc-700 rounded-lg p-1">
+                        {[
+                            { key: 'shelves', icon: 'inventory_2', label: 'Locaties' },
+                            { key: 'items', icon: 'list_alt', label: 'Items' },
+                            { key: 'projects', icon: 'build', label: 'BoM' },
+                            { key: 'map', icon: 'map', label: 'Map' }
+                        ].map(tab => (
+                            <button key={tab.key} onClick={() => setView(tab.key)} className={`flex-1 py-2 px-3 rounded-md font-mono text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${view === tab.key ? 'bg-amber-500 text-zinc-900 shadow-lg shadow-amber-500/20' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'}`}>
+                                <span className="material-icons" style={{fontSize:'16px'}}>{tab.icon}</span>
+                                <span className="hidden sm:inline">{tab.label}</span>
+                            </button>
+                        ))}
                     </div>
 
                     {view === 'shelves' && (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             {locationGroups.map(({ parent, children, totalBoxes }) => (
-                                <div key={parent} className="bg-zinc-900 border border-zinc-700 rounded-xl shadow overflow-hidden">
+                                <div key={parent} className="bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden card-hover">
                                     <div
                                         onClick={() => toggleLocation(parent)}
-                                        className="p-3 flex justify-between items-center cursor-pointer hover:bg-zinc-800"
+                                        className="p-4 flex justify-between items-center cursor-pointer hover:bg-zinc-800/80 transition-colors"
                                     >
-                                        <div>
-                                            <h3 className="font-bold">{parent}</h3>
-                                            <span className="text-xs text-zinc-500">{totalBoxes} boxes</span>
+                                        <div className="flex items-center gap-3">
+                                            <span className="material-icons text-amber-500" style={{fontSize:'20px'}}>folder</span>
+                                            <div>
+                                                <h3 className="font-mono font-bold text-zinc-100">{parent}</h3>
+                                                <span className="text-xs text-zinc-500 font-mono">{totalBoxes} boxes</span>
+                                            </div>
                                         </div>
-                                        <span className="text-xl text-zinc-500">{expandedLocations.has(parent) ? '▼' : '▶'}</span>
+                                        <span className="material-icons text-zinc-500 transition-transform" style={{fontSize:'20px', transform: expandedLocations.has(parent) ? 'rotate(180deg)' : 'rotate(0)'}}>{expandedLocations.has(parent) ? 'expand_more' : 'chevron_right'}</span>
                                     </div>
                                     {expandedLocations.has(parent) && (
-                                        <div className="border-t">
+                                        <div className="border-t border-zinc-800">
                                             {children.map(({ name: childName, boxes: childBoxes }) => (
                                                 <div key={childName || '_root'}>
                                                     {childName && (
                                                         <div
                                                             onClick={() => toggleLocation(parent + ':' + childName)}
-                                                            className="p-2 pl-6 flex justify-between items-center cursor-pointer hover:bg-zinc-800 bg-zinc-800 border-b"
+                                                            className="p-3 pl-8 flex justify-between items-center cursor-pointer hover:bg-zinc-800/50 bg-zinc-800/30 border-b border-zinc-800 transition-colors"
                                                         >
-                                                            <div>
-                                                                <span className="font-medium text-zinc-200">{childName}</span>
-                                                                <span className="text-xs text-zinc-500 ml-2">{childBoxes.length} boxes</span>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="material-icons text-zinc-500" style={{fontSize:'16px'}}>subdirectory_arrow_right</span>
+                                                                <span className="font-mono text-sm text-zinc-200">{childName}</span>
+                                                                <span className="text-xs px-1.5 py-0.5 bg-zinc-700 text-zinc-400 rounded font-mono">{childBoxes.length}</span>
                                                             </div>
-                                                            <span className="text-zinc-500">{expandedLocations.has(parent + ':' + childName) ? '▼' : '▶'}</span>
+                                                            <span className="material-icons text-zinc-600" style={{fontSize:'16px'}}>{expandedLocations.has(parent + ':' + childName) ? 'expand_more' : 'chevron_right'}</span>
                                                         </div>
                                                     )}
                                                     {(!childName || expandedLocations.has(parent + ':' + childName)) && (
-                                                        <div className="divide-y">
+                                                        <div className="divide-y divide-zinc-800/50">
                                                             {childBoxes.map(box => {
                                                                 const boxItems = items.filter(i => i.box === box.label);
                                                                 const hasOverallocated = boxItems.some(i => isOverallocated(i));
@@ -2109,19 +2140,19 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                                                     <div
                                                                         key={box.label}
                                                                         onClick={() => setSelectedBox(box)}
-                                                                        className={`p-2 ${childName ? 'pl-10' : 'pl-6'} flex justify-between items-center cursor-pointer hover:bg-zinc-800 ${hasOverallocated ? 'bg-red-500/10' : ''}`}
+                                                                        className={`p-3 ${childName ? 'pl-12' : 'pl-8'} flex justify-between items-center cursor-pointer hover:bg-zinc-800/50 transition-colors ${hasOverallocated ? 'bg-red-500/5' : ''}`}
                                                                     >
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className={`w-2 h-2 rounded-full ${{'Electronics': 'bg-amber-500', '3D Printing': 'bg-yellow-500', 'Mechanical': 'bg-green-500'}[box.theme] || 'bg-zinc-600'}`}></span>
+                                                                        <div className="flex items-center gap-2.5">
+                                                                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${{'Electronics': 'bg-amber-500', '3D Printing': 'bg-yellow-500', 'Mechanical': 'bg-green-500'}[box.theme] || 'bg-zinc-600'}`}></span>
                                                                             <div>
-                                                                                <span className="font-medium">{box.label}</span>
-                                                                                <span className="text-zinc-500 text-sm ml-2">{box.contents}</span>
-                                                                                {box.type && <span className="text-amber-400 text-xs ml-2">{box.type}</span>}
+                                                                                <span className="font-mono font-bold text-sm text-zinc-100">{box.label}</span>
+                                                                                <span className="text-zinc-500 text-xs ml-2">{box.contents}</span>
+                                                                                {box.type && <span className="text-xs px-1.5 py-0.5 bg-amber-500/10 text-amber-400 rounded font-mono ml-2">{box.type}</span>}
                                                                             </div>
                                                                         </div>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className="text-xs text-zinc-500">{boxItems.length} items</span>
-                                                                            {hasOverallocated && <span>⚠️</span>}
+                                                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                                                            <span className="text-xs text-zinc-500 font-mono">{boxItems.length}</span>
+                                                                            {hasOverallocated && <span className="material-icons text-red-400" style={{fontSize:'14px'}}>warning</span>}
                                                                         </div>
                                                                     </div>
                                                                 );
@@ -2138,78 +2169,87 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                     )}
 
                     {view === 'items' && (
-                        <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow overflow-hidden">
-                            <div className="divide-y max-h-96 overflow-y-auto">
+                        <div className="bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden">
+                            <div className="divide-y divide-zinc-800/50 max-h-[calc(100vh-280px)] overflow-y-auto">
                                 {(showAllItems ? filteredItems : filteredItems.slice(0,50)).map(item => (
-                                    <div key={item.id} className={`flex items-center p-3 ${isOverallocated(item) ? 'bg-red-500/10' : ''}`} onClick={() => setEditItem(item)}>
-                                        {item.image && <img src={item.image.startsWith('http') ? item.image : `https:${item.image}`} alt="" className="w-10 h-10 object-cover rounded mr-2 flex-shrink-0" onError={e => e.target.style.display='none'}/>}
+                                    <div key={item.id} className={`flex items-center p-3 cursor-pointer hover:bg-zinc-800/50 transition-colors ${isOverallocated(item) ? 'bg-red-500/5 border-l-2 border-red-500' : ''}`} onClick={() => setEditItem(item)}>
+                                        {item.image && <img src={item.image.startsWith('http') ? item.image : `https:${item.image}`} alt="" className="w-10 h-10 object-cover rounded-lg mr-3 flex-shrink-0 border border-zinc-700" onError={e => e.target.style.display='none'}/>}
                                         <div className="flex-1 min-w-0">
-                                            <div className="font-medium truncate">{item.name}</div>
-                                            <div className="text-xs text-zinc-500">
-                                                {item.nc && <span className="font-mono">{item.nc} • </span>}
-                                                {item.box} • {item.category}
+                                            <div className="text-sm text-zinc-100 truncate">{item.name}</div>
+                                            <div className="text-xs text-zinc-500 font-mono mt-0.5">
+                                                {item.nc && <span>{item.nc} • </span>}
+                                                <span className="text-zinc-400">{item.box}</span> • {item.category}
                                                 {item.subcategory && <span className="text-purple-400"> • {item.subcategory}</span>}
                                                 {item.value > 0 && <span className="text-green-400"> • €{item.value.toFixed(2)}</span>}
-                                                {item.projects?.length > 0 && <span className="text-amber-500"> • {item.projects.length} project(s)</span>}
-                                                {item.link && <span className="text-amber-400"> • 🔗</span>}
+                                                {item.projects?.length > 0 && <span className="text-amber-400"> • {item.projects.length}p</span>}
+                                                {item.link && <span className="text-amber-400"> • <span className="material-icons" style={{fontSize:'11px',verticalAlign:'middle'}}>link</span></span>}
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-1 ml-2">
-                                            <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); updateQuantity(item.id, -1); }} className="w-8 h-8 bg-red-500/20 rounded-lg">-</button>
-                                            <span className="w-8 text-center font-mono">{item.quantity}</span>
-                                            <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); updateQuantity(item.id, 1); }} className="w-8 h-8 bg-green-500/20 rounded-lg">+</button>
+                                        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+                                            <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); updateQuantity(item.id, -1); }} className="w-8 h-8 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg transition-colors text-sm">-</button>
+                                            <span className="w-8 text-center font-mono text-sm text-zinc-100">{item.quantity}</span>
+                                            <button type="button" onClick={(e) => { e.stopPropagation(); e.preventDefault(); updateQuantity(item.id, 1); }} className="w-8 h-8 bg-green-500/20 hover:bg-green-500/30 text-green-400 rounded-lg transition-colors text-sm">+</button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
-                            {filteredItems.length > 50 && !showAllItems && <div onClick={() => setShowAllItems(true)} className="p-2 text-center text-amber-500 text-sm cursor-pointer hover:bg-zinc-800">+{filteredItems.length - 50} more</div>}
+                            {filteredItems.length > 50 && !showAllItems && <div onClick={() => setShowAllItems(true)} className="p-3 text-center text-amber-500 text-xs font-mono cursor-pointer hover:bg-zinc-800 border-t border-zinc-800 transition-colors">+ {filteredItems.length - 50} more items</div>}
                         </div>
                     )}
 
                     {view === 'projects' && (
-                        <div className="space-y-3">
-                            <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow p-3">
-                                <div className="text-sm text-zinc-500">Totale inventariswaarde</div>
-                                <div className="text-2xl font-bold text-green-400">€{totalInventoryValue.toFixed(2)}</div>
+                        <div className="space-y-4">
+                            {/* Inventory Value Card */}
+                            <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-5">
+                                <div className="flex gap-1.5 mb-3">
+                                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                </div>
+                                <div className="text-xs text-zinc-500 font-mono">Totale inventariswaarde</div>
+                                <div className="text-3xl font-mono font-bold text-green-400 mt-1">€{totalInventoryValue.toFixed(2)}</div>
                             </div>
                             {projectsData.length === 0 ? (
-                                <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow p-4 text-center text-zinc-500">
-                                    <p>Geen projecten gevonden.</p>
-                                    <p className="text-sm mt-1">Wijs items toe aan projecten via het item bewerken scherm.</p>
+                                <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-8 text-center">
+                                    <span className="material-icons text-zinc-600 mb-3" style={{fontSize:'48px'}}>build_circle</span>
+                                    <p className="text-zinc-400 font-mono text-sm">Geen projecten gevonden.</p>
+                                    <p className="text-zinc-600 text-xs mt-1">Wijs items toe aan projecten via het item bewerken scherm.</p>
                                 </div>
                             ) : (
-                                projectsData.map(project => (
-                                    <div key={project.name} className={`bg-zinc-900 border border-zinc-700 rounded-xl shadow overflow-hidden ${project.allInStock ? 'ring-2 ring-green-400' : 'ring-2 ring-orange-400'}`}>
-                                        <div className="p-3 border-b flex justify-between items-center">
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                {projectsData.map(project => (
+                                    <div key={project.name} className={`bg-zinc-900 border rounded-lg overflow-hidden card-hover ${project.allInStock ? 'border-green-500/30' : 'border-orange-500/30'}`}>
+                                        <div className="p-4 border-b border-zinc-800 flex justify-between items-center">
                                             <div>
-                                                <h3 className="font-bold text-lg">{project.name}</h3>
-                                                <span className={`text-xs px-2 py-0.5 rounded ${project.allInStock ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                                                <h3 className="font-mono font-bold text-zinc-100">{project.name}</h3>
+                                                <span className={`text-xs px-2 py-0.5 rounded font-mono mt-1 inline-block ${project.allInStock ? 'bg-green-500/10 text-green-400' : 'bg-orange-500/10 text-orange-400'}`}>
                                                     {project.allInStock ? '✓ Compleet' : '⚠ Onderdelen ontbreken'}
                                                 </span>
                                             </div>
                                             <div className="text-right">
-                                                <div className="text-lg font-bold text-green-400">€{project.totalValue.toFixed(2)}</div>
-                                                <div className="text-xs text-zinc-500">{project.items.length} items</div>
+                                                <div className="text-lg font-mono font-bold text-green-400">€{project.totalValue.toFixed(2)}</div>
+                                                <div className="text-xs text-zinc-500 font-mono">{project.items.length} items</div>
                                             </div>
                                         </div>
-                                        <div className="divide-y max-h-48 overflow-y-auto">
+                                        <div className="divide-y divide-zinc-800/50 max-h-48 overflow-y-auto">
                                             {project.items.map((item, idx) => (
-                                                <div key={idx} className={`p-2 flex justify-between items-center text-sm ${item.inStock ? '' : 'bg-red-500/10'}`} onClick={() => setEditItem(items.find(i => i.id === item.id))}>
+                                                <div key={idx} className={`p-3 flex justify-between items-center text-sm cursor-pointer hover:bg-zinc-800/50 transition-colors ${item.inStock ? '' : 'bg-red-500/5'}`} onClick={() => setEditItem(items.find(i => i.id === item.id))}>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="truncate">{item.name}</div>
-                                                        <div className="text-xs text-zinc-500">{item.box}</div>
+                                                        <div className="truncate text-zinc-200 text-sm">{item.name}</div>
+                                                        <div className="text-xs text-zinc-500 font-mono">{item.box}</div>
                                                     </div>
                                                     <div className="text-right flex-shrink-0 ml-2">
-                                                        <div className={item.inStock ? 'text-green-400' : 'text-red-600'}>
+                                                        <div className={`font-mono text-sm ${item.inStock ? 'text-green-400' : 'text-red-400'}`}>
                                                             {item.available}/{item.needed}
                                                         </div>
-                                                        <div className="text-xs text-zinc-500">€{item.value.toFixed(2)}</div>
+                                                        <div className="text-xs text-zinc-500 font-mono">€{item.value.toFixed(2)}</div>
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
                                     </div>
-                                ))
+                                ))}
+                                </div>
                             )}
                         </div>
                     )}
@@ -2231,22 +2271,27 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                             setView('shelves');
                         };
                         return (
-                            <div className="bg-zinc-950 rounded-xl shadow p-4">
-                                <h3 className="font-bold mb-3 text-center text-white">Lab Layout</h3>
-                                <div className="relative bg-black rounded-lg" style={{height: '300px'}}>
+                            <div className="bg-zinc-900 border border-zinc-700 rounded-lg p-5">
+                                <div className="flex gap-1.5 mb-3">
+                                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                </div>
+                                <h3 className="font-mono font-bold text-zinc-100 mb-4 text-center">Lab Layout</h3>
+                                <div className="relative bg-zinc-950 border border-zinc-800 rounded-lg" style={{height: '340px'}}>
                                     {/* Left side - Storage blocks stacked vertically */}
-                                    <div className="absolute left-3 top-3 bottom-3 w-32 flex flex-col gap-2">
+                                    <div className="absolute left-3 top-3 bottom-3 w-36 flex flex-col gap-2">
                                         {['Displays & Passives', 'Boards & Sensors', '3D Print & Power', 'ICs & Hardware'].map(name => {
                                             const stats = getLocationStats(name);
                                             return (
                                                 <button
                                                     key={name}
                                                     onClick={() => navigateToLocation(name)}
-                                                    className={`flex-1 border border-zinc-600 bg-zinc-800 text-white p-2 text-left hover:bg-zinc-700 transition rounded ${stats.hasOverallocated ? 'border-red-500' : ''}`}
+                                                    className={`flex-1 border bg-zinc-900 p-3 text-left rounded-lg transition-all hover:border-amber-500/50 hover:bg-zinc-800/80 hover:shadow-lg hover:shadow-amber-500/10 ${stats.hasOverallocated ? 'border-red-500/50' : 'border-zinc-700'}`}
                                                 >
-                                                    <div className="font-bold text-xs">{name}</div>
-                                                    <div className="text-xs text-zinc-500">Lade {stats.childNames || 'A,B,C,D'}</div>
-                                                    {stats.hasOverallocated && <span className="text-red-400 text-xs">⚠️</span>}
+                                                    <div className="font-mono font-bold text-xs text-zinc-100">{name}</div>
+                                                    <div className="text-xs text-zinc-500 font-mono mt-1">Lade {stats.childNames || 'A,B,C,D'}</div>
+                                                    {stats.hasOverallocated && <span className="material-icons text-red-400 mt-1" style={{fontSize:'12px'}}>warning</span>}
                                                 </button>
                                             );
                                         })}
@@ -2259,27 +2304,28 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                                 <button
                                                     key={name}
                                                     onClick={() => navigateToLocation(name)}
-                                                    className={`w-12 border border-zinc-600 bg-zinc-800 text-white hover:bg-zinc-700 transition rounded flex items-center justify-center ${stats.hasOverallocated ? 'border-red-500' : ''}`}
+                                                    className={`w-14 border bg-zinc-900 rounded-lg transition-all hover:border-amber-500/50 hover:bg-zinc-800/80 hover:shadow-lg hover:shadow-amber-500/10 flex items-center justify-center ${stats.hasOverallocated ? 'border-red-500/50' : 'border-zinc-700'}`}
                                                     style={{writingMode: 'vertical-rl', textOrientation: 'mixed'}}
                                                 >
-                                                    <span className="font-bold text-sm">{name}</span>
-                                                    {stats.hasOverallocated && <span className="text-red-400 ml-1">⚠️</span>}
+                                                    <span className="font-mono font-bold text-sm text-zinc-100">{name}</span>
+                                                    {stats.hasOverallocated && <span className="material-icons text-red-400 ml-1" style={{fontSize:'12px'}}>warning</span>}
                                                 </button>
                                             );
                                         })}
                                     </div>
                                 </div>
-                                <p className="text-center text-sm text-zinc-500 mt-3">Klik op een locatie om boxes te zien</p>
+                                <p className="text-center text-xs text-zinc-500 font-mono mt-3">Klik op een locatie om boxes te zien</p>
                             </div>
                         );
                     })()}
 
-                    <div className="mt-3 flex gap-2">
-                        <button onClick={exportData} className="flex-1 py-2 bg-green-500 text-white rounded-lg text-sm"><span class="material-icons text-sm align-middle">download</span> Export</button>
-                        <label className="flex-1 py-2 bg-amber-500 text-white rounded-lg text-sm text-center cursor-pointer"><span class="material-icons text-sm align-middle">upload</span> Import<input type="file" accept=".json,.zip" onChange={importData} className="hidden"/></label>
+                    {/* Footer Actions */}
+                    <div className="mt-5 flex gap-2">
+                        <button onClick={exportData} className="flex-1 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg text-xs font-mono flex items-center justify-center gap-1.5 transition-colors"><span class="material-icons" style={{fontSize:'16px'}}>download</span> Export</button>
+                        <label className="flex-1 py-2.5 bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-lg text-xs font-mono text-center cursor-pointer flex items-center justify-center gap-1.5 transition-colors"><span class="material-icons" style={{fontSize:'16px'}}>upload</span> Import<input type="file" accept=".json,.zip" onChange={importData} className="hidden"/></label>
                         {(search || filterTheme !== 'all') && (
-                            <button 
-                                onClick={() => { 
+                            <button
+                                onClick={() => {
                                     const count = filteredItems.length;
                                     if (count === 0) {
                                         alert('Geen items om te verwijderen.');
@@ -2291,10 +2337,10 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                         idsToDelete.forEach(id => deletePhoto(id).catch(() => {}));
                                         setSearch('');
                                     }
-                                }} 
-                                className="py-2 px-3 bg-red-500/100 text-white rounded-lg text-sm" 
+                                }}
+                                className="py-2.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs font-mono transition-colors"
                                 title="Verwijder gefilterde items"
-                            ><span class="material-icons text-sm">delete</span></button>
+                            ><span class="material-icons" style={{fontSize:'16px'}}>delete</span></button>
                         )}
                     </div>
 
