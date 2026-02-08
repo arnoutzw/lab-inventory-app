@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="Lab Inventory">
     <meta name="theme-color" content="#f59e0b">
     <!-- Content Security Policy - OWASP recommended security header -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: blob:; connect-src 'self'; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app wss://*.firebaseio.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
     <title>Electronics Lab Inventory</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -25,6 +25,21 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+    <script>
+      // Initialize Firebase
+      firebase.initializeApp({
+        apiKey: "AIzaSyAqRWVgti-CuXzr5AkhDKmPlu7iA2MQpUg",
+        authDomain: "arnout-s-homelab.firebaseapp.com",
+        projectId: "arnout-s-homelab",
+        storageBucket: "arnout-s-homelab.firebasestorage.app",
+        messagingSenderId: "258011834485",
+        appId: "1:258011834485:web:5afb1efaa303b4dd93f03c",
+        measurementId: "G-VXDKDLXP7L"
+      });
+      const firestore = firebase.firestore();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -575,7 +590,64 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         const deletePhoto = async (itemId) => {
             await dbDelete('photos', itemId);
         };
-        
+
+        // ========================================
+        // Firestore Sync Layer
+        // ========================================
+        const FIRESTORE_DOC = 'lab-inventory/main';
+
+        const firestoreLoad = async () => {
+            try {
+                const doc = await firestore.doc(FIRESTORE_DOC).get();
+                if (doc.exists) {
+                    return doc.data();
+                }
+                return null;
+            } catch (err) {
+                console.warn('Firestore load failed, falling back to local:', err);
+                return null;
+            }
+        };
+
+        const firestoreSave = (() => {
+            let pending = null;
+            let timer = null;
+            // Debounce writes: wait 1.5s after last change before pushing to Firestore
+            return (boxes, items) => {
+                pending = { boxes, items, updatedAt: new Date().toISOString() };
+                if (timer) clearTimeout(timer);
+                timer = setTimeout(async () => {
+                    if (!pending) return;
+                    const data = pending;
+                    pending = null;
+                    try {
+                        await firestore.doc(FIRESTORE_DOC).set(data, { merge: true });
+                        console.log('Firestore synced', data.items.length, 'items,', data.boxes.length, 'boxes');
+                    } catch (err) {
+                        console.error('Firestore save error:', err);
+                    }
+                }, 1500);
+            };
+        })();
+
+        const firestoreSaveSettings = async (settings) => {
+            try {
+                await firestore.doc('lab-inventory/settings').set(settings);
+            } catch (err) {
+                console.error('Firestore settings save error:', err);
+            }
+        };
+
+        const firestoreLoadSettings = async () => {
+            try {
+                const doc = await firestore.doc('lab-inventory/settings').get();
+                return doc.exists ? doc.data() : null;
+            } catch (err) {
+                console.warn('Firestore settings load failed:', err);
+                return null;
+            }
+        };
+
         // 12NC Code generator (Philips format: XXYY ZZZ ZZZZZ)
         const generateNC = (category, existingItems) => {
             const groups = { 'Electronics': '48', '3D Printing': '40', 'Mechanical': '24', 'Other': '53' };
@@ -1521,10 +1593,16 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             const [items, setItems] = useState([]);
             const [settings, setSettings] = useState({ darkMode: false });
 
-            // Load settings from IndexedDB
+            // Load settings: Firestore → IndexedDB → localStorage
             useEffect(() => {
-                dbGet('settings', 'main').then(saved => {
-                    if (saved) setSettings({ darkMode: saved.darkMode || false });
+                firestoreLoadSettings().then(fsSettings => {
+                    if (fsSettings) {
+                        setSettings(fsSettings);
+                    } else {
+                        return dbGet('settings', 'main').then(saved => {
+                            if (saved) setSettings({ darkMode: saved.darkMode || false });
+                        });
+                    }
                 }).catch(() => {
                     const saved = localStorage.getItem(SETTINGS_KEY);
                     if (saved) setSettings(JSON.parse(saved));
@@ -1586,11 +1664,29 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             useEffect(() => {
                 const loadData = async () => {
                     try {
-                        // Try IndexedDB first
+                        // Try Firestore first
+                        const fsData = await firestoreLoad();
+                        if (fsData && fsData.items && fsData.items.length > 0) {
+                            console.log('Loaded from Firestore:', fsData.items.length, 'items,', (fsData.boxes || []).length, 'boxes');
+                            setBoxes(fsData.boxes || []);
+                            setItems(fsData.items || []);
+                            // Also cache locally in IndexedDB
+                            await dbPut('inventory', { id: 'main', boxes: fsData.boxes || [], items: fsData.items || [] }).catch(() => {});
+                            setLoading(false);
+                            return;
+                        }
+                    } catch (err) {
+                        console.warn('Firestore load failed, trying local storage:', err);
+                    }
+
+                    try {
+                        // Fall back to IndexedDB
                         const dbData = await dbGet('inventory', 'main');
                         if (dbData) {
                             setBoxes(dbData.boxes || []);
                             setItems(dbData.items || []);
+                            // Push existing local data to Firestore
+                            firestoreSave(dbData.boxes || [], dbData.items || []);
                         } else {
                             // Migrate from localStorage if exists
                             const saved = localStorage.getItem(STORAGE_KEY);
@@ -1598,14 +1694,16 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                 const data = JSON.parse(saved);
                                 setBoxes(data.boxes || []);
                                 setItems(data.items || []);
-                                // Migrate to IndexedDB
                                 await dbPut('inventory', { id: 'main', boxes: data.boxes, items: data.items });
-                                console.log('Migrated localStorage to IndexedDB');
+                                firestoreSave(data.boxes || [], data.items || []);
+                                console.log('Migrated localStorage → IndexedDB + Firestore');
                             } else if (window.INVENTORY_DATABASE) {
                                 const data = window.INVENTORY_DATABASE;
                                 setBoxes(data.boxes || []);
                                 setItems(data.items || []);
                                 await dbPut('inventory', { id: 'main', boxes: data.boxes, items: data.items });
+                                firestoreSave(data.boxes || [], data.items || []);
+                                console.log('Seeded from INVENTORY_DATABASE → IndexedDB + Firestore');
                             }
                         }
                     } catch (err) {
@@ -1630,17 +1728,20 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
 
             useEffect(() => {
                 if (!loading && items.length > 0) {
+                    // Save locally (IndexedDB + localStorage backup)
                     localStorage.setItem(STORAGE_KEY, JSON.stringify({ boxes, items }));
                     dbPut('inventory', { id: 'main', boxes, items }).catch(err => {
                         console.error('IndexedDB save error:', err);
                     });
+                    // Sync to Firestore (debounced)
+                    firestoreSave(boxes, items);
                 }
             }, [items, boxes, loading]);
             useEffect(() => {
                 dbPut('settings', { id: 'main', ...settings }).catch(() => {
                     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
                 });
-                // Dark theme is now always applied via Tailwind classes
+                firestoreSaveSettings(settings);
             }, [settings]);
             useEffect(() => { setShowAllItems(false); }, [search, filterTheme]);
 
