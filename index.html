@@ -51,6 +51,74 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
       } else {
         console.warn('Firebase config not provided. Running in offline-only mode.');
       }
+
+      // ========================================
+      // SSO Authentication Layer (early registration)
+      // Must be in a regular <script> tag, NOT inside text/babel,
+      // because Babel standalone compiles async and the parent
+      // postMessage will arrive before the listener is ready.
+      // ========================================
+      const ALLOWED_SSO_ORIGINS = [
+          'https://arnoutzw.github.io',
+          'https://zwartbol.industries'
+      ];
+
+      // Shared SSO state (set via postMessage from parent portfolio)
+      window.__ssoUser = null;
+      window.__ssoIsAdmin = false;
+      window.__ssoListeners = new Set();
+      window.__notifySSO = function() {
+          window.__ssoListeners.forEach(function(fn) {
+              fn({ user: window.__ssoUser, isAdmin: window.__ssoIsAdmin });
+          });
+      };
+
+      // Listen for SSO credentials from parent portfolio
+      window.addEventListener('message', async function(event) {
+          // Validate origin to prevent spoofed auth messages
+          if (!ALLOWED_SSO_ORIGINS.includes(event.origin)) {
+              return;
+          }
+
+          var data = event.data;
+          if (!data || data.type !== 'admin-auth') return;
+
+          window.__ssoIsAdmin = !!data.isAdmin;
+
+          if (data.sso && data.sso.idToken) {
+              window.__ssoUser = {
+                  uid: data.sso.uid,
+                  email: data.sso.email,
+                  displayName: data.sso.displayName,
+                  photoURL: data.sso.photoURL,
+                  idToken: data.sso.idToken,
+              };
+
+              // Sign in to Firebase Auth using the SSO credential
+              if (firebaseAuth) {
+                  try {
+                      var credential = firebase.auth.GoogleAuthProvider.credential(data.sso.idToken);
+                      await firebaseAuth.signInWithCredential(credential);
+                  } catch (err) {
+                      console.warn('Firebase SSO sign-in failed:', err.message);
+                  }
+              }
+          } else {
+              window.__ssoUser = null;
+              if (firebaseAuth) {
+                  try { await firebaseAuth.signOut(); } catch (e) {}
+              }
+          }
+
+          window.__notifySSO();
+      });
+
+      // Tell the parent we're ready to receive SSO credentials.
+      // This handles the race condition where the parent sent the
+      // message before this iframe's listener was registered.
+      if (window.parent !== window) {
+          window.parent.postMessage({ type: 'sso-ready', app: 'lab-inventory' }, '*');
+      }
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -271,63 +339,10 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         const STORAGE_KEY = 'arnout-lab-inventory-v2';
         const SETTINGS_KEY = 'arnout-lab-settings';
 
-        // ========================================
-        // SSO Authentication Layer
-        // App is gated behind parent portfolio SSO.
-        // No SSO credentials = no access.
-        // ========================================
-        const ALLOWED_SSO_ORIGINS = [
-            'https://arnoutzw.github.io',
-            'https://zwartbol.industries'
-        ];
-
-        // Shared SSO state (set via postMessage from parent portfolio)
-        let ssoUser = null;
-        let ssoIsAdmin = false;
-
-        // SSO event listeners (components register callbacks here)
-        const ssoListeners = new Set();
-        const notifySSOListeners = () => ssoListeners.forEach(fn => fn({ user: ssoUser, isAdmin: ssoIsAdmin }));
-
-        // Listen for SSO credentials from parent portfolio
-        window.addEventListener('message', async (event) => {
-            // Validate origin to prevent spoofed auth messages
-            if (!ALLOWED_SSO_ORIGINS.includes(event.origin)) {
-                return;
-            }
-
-            const data = event.data;
-            if (!data || data.type !== 'admin-auth') return;
-
-            ssoIsAdmin = !!data.isAdmin;
-
-            if (data.sso && data.sso.idToken) {
-                ssoUser = {
-                    uid: data.sso.uid,
-                    email: data.sso.email,
-                    displayName: data.sso.displayName,
-                    photoURL: data.sso.photoURL,
-                    idToken: data.sso.idToken,
-                };
-
-                // Sign in to Firebase Auth using the SSO credential
-                if (firebaseAuth) {
-                    try {
-                        const credential = firebase.auth.GoogleAuthProvider.credential(data.sso.idToken);
-                        await firebaseAuth.signInWithCredential(credential);
-                    } catch (err) {
-                        console.warn('Firebase SSO sign-in failed:', err.message);
-                    }
-                }
-            } else {
-                ssoUser = null;
-                if (firebaseAuth) {
-                    try { await firebaseAuth.signOut(); } catch (e) {}
-                }
-            }
-
-            notifySSOListeners();
-        });
+        // SSO state accessors (actual listener is in the early <script> tag above)
+        const getSSOUser = () => window.__ssoUser;
+        const getSSOIsAdmin = () => window.__ssoIsAdmin;
+        const ssoListeners = window.__ssoListeners;
         // IndexedDB Helper for persistent storage with photo support
 
         // App version info
@@ -993,12 +1008,12 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                 )}
                             </div>
                             <hr className="border-zinc-800"/>
-                            {ssoUser && (
+                            {getSSOUser() && (
                                 <div className="bg-zinc-800 border border-zinc-700 p-3 rounded-lg flex items-center gap-3">
-                                    {ssoUser.photoURL && <img src={ssoUser.photoURL} alt="" className="w-8 h-8 rounded-full border border-amber-500/30" />}
+                                    {getSSOUser().photoURL && <img src={getSSOUser().photoURL} alt="" className="w-8 h-8 rounded-full border border-amber-500/30" />}
                                     <div>
-                                        <div className="text-sm text-zinc-200 font-mono">{ssoUser.displayName || 'User'}</div>
-                                        <div className="text-xs text-zinc-500 font-mono">{ssoUser.email}</div>
+                                        <div className="text-sm text-zinc-200 font-mono">{getSSOUser().displayName || 'User'}</div>
+                                        <div className="text-xs text-zinc-500 font-mono">{getSSOUser().email}</div>
                                     </div>
                                     <span className="ml-auto text-xs text-green-400 font-mono">SSO</span>
                                 </div>
@@ -1519,11 +1534,16 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         };
 
         const SSOGate = ({ children }) => {
-            const [authState, setAuthState] = useState({ user: ssoUser, isAdmin: ssoIsAdmin });
+            const [authState, setAuthState] = useState({ user: getSSOUser(), isAdmin: getSSOIsAdmin() });
 
             useEffect(() => {
                 const listener = (state) => setAuthState({ ...state });
                 ssoListeners.add(listener);
+                // Check immediately in case SSO arrived before React mounted
+                const current = getSSOUser();
+                if (current && !authState.user) {
+                    setAuthState({ user: current, isAdmin: getSSOIsAdmin() });
+                }
                 return () => ssoListeners.delete(listener);
             }, []);
 
