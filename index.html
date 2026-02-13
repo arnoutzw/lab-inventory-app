@@ -109,27 +109,53 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         console.warn('Firebase config not provided. Running in offline-only mode.');
       }
 
-      // Process any SSO credentials that arrived while Firebase was loading
+      // Unified auth state: update window.__sso whenever Firebase auth changes.
+      // This covers BOTH postMessage SSO (signInWithCredential) and direct
+      // Google Sign-In (signInWithPopup), so the app works embedded or standalone.
+      if (firebaseAuth) {
+          firebaseAuth.onAuthStateChanged(function(fbUser) {
+              if (fbUser) {
+                  window.__sso.user = {
+                      uid: fbUser.uid,
+                      email: fbUser.email,
+                      displayName: fbUser.displayName,
+                      photoURL: fbUser.photoURL,
+                      idToken: null
+                  };
+                  // Grab a fresh ID token
+                  fbUser.getIdToken().then(function(token) {
+                      if (window.__sso.user) window.__sso.user.idToken = token;
+                  });
+              } else {
+                  window.__sso.user = null;
+                  window.__sso.isAdmin = false;
+              }
+              window.__sso.notify();
+          });
+      }
+
+      // Process any SSO credentials that arrived via postMessage while Firebase was loading
       (async function() {
           var pending = window.__sso._pending;
-          if (pending && firebaseAuth) {
-              if (pending.sso && pending.sso.idToken) {
-                  try {
-                      var credential = firebase.auth.GoogleAuthProvider.credential(pending.sso.idToken);
-                      await firebaseAuth.signInWithCredential(credential);
-                  } catch (err) {
-                      console.warn('SSO sign-in failed:', err.message);
-                  }
+          if (pending && firebaseAuth && pending.sso && pending.sso.idToken) {
+              try {
+                  var credential = firebase.auth.GoogleAuthProvider.credential(pending.sso.idToken);
+                  await firebaseAuth.signInWithCredential(credential);
+                  // onAuthStateChanged above will update window.__sso
+              } catch (err) {
+                  console.warn('SSO sign-in failed:', err.message);
               }
               window.__sso._pending = null;
           }
 
-          // Also handle future messages that arrive after Firebase is ready
+          // Handle future postMessage credentials that arrive after Firebase is ready
           window.addEventListener('message', async function(event) {
               if (!ALLOWED_SSO_ORIGINS.includes(event.origin)) return;
               var data = event.data;
               if (!data || data.type !== 'admin-auth') return;
               if (!firebaseAuth) return;
+
+              window.__sso.isAdmin = !!data.isAdmin;
 
               if (data.sso && data.sso.idToken) {
                   try {
@@ -1604,6 +1630,23 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
 
         const SSOGate = ({ children }) => {
             const { user } = useSSO();
+            const [signingIn, setSigningIn] = useState(false);
+            const [error, setError] = useState(null);
+            const isEmbedded = window.parent !== window;
+
+            const handleGoogleSignIn = async () => {
+                if (!firebaseAuth) { setError('Firebase not configured'); return; }
+                setSigningIn(true);
+                setError(null);
+                try {
+                    var provider = new firebase.auth.GoogleAuthProvider();
+                    await firebaseAuth.signInWithPopup(provider);
+                    // onAuthStateChanged will update window.__sso automatically
+                } catch (err) {
+                    setError(err.message);
+                    setSigningIn(false);
+                }
+            };
 
             if (!user) {
                 return (
@@ -1614,16 +1657,39 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                 <h1 className="text-xl font-mono font-bold text-zinc-100 mt-3">
                                     <span className="text-amber-500">$</span> lab_inventory
                                 </h1>
-                                <p className="text-xs text-zinc-500 font-mono mt-2">
-                                    Waiting for SSO authentication...
-                                </p>
-                                <p className="text-xs text-zinc-600 font-mono mt-1">
-                                    Sign in via the parent portfolio to access this app.
-                                </p>
+                                {isEmbedded ? (
+                                    <>
+                                        <p className="text-xs text-zinc-500 font-mono mt-2">
+                                            Waiting for SSO authentication...
+                                        </p>
+                                        <p className="text-xs text-zinc-600 font-mono mt-1">
+                                            Sign in via the parent portfolio to access this app.
+                                        </p>
+                                    </>
+                                ) : (
+                                    <p className="text-xs text-zinc-500 font-mono mt-2">
+                                        Sign in to access the inventory.
+                                    </p>
+                                )}
                             </div>
-                            <div className="flex justify-center">
-                                <span className="material-icons text-zinc-600 animate-spin" style={{fontSize: '24px'}}>sync</span>
-                            </div>
+                            {isEmbedded && !error && (
+                                <div className="flex justify-center mb-4">
+                                    <span className="material-icons text-zinc-600 animate-spin" style={{fontSize: '24px'}}>sync</span>
+                                </div>
+                            )}
+                            {firebaseAuth && (
+                                <button
+                                    onClick={handleGoogleSignIn}
+                                    disabled={signingIn}
+                                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-600 text-zinc-200 rounded-lg font-mono text-sm transition-colors disabled:opacity-50"
+                                >
+                                    <span className="material-icons text-base">login</span>
+                                    {signingIn ? 'Signing in...' : 'Sign in with Google'}
+                                </button>
+                            )}
+                            {error && (
+                                <p className="text-xs text-red-400 font-mono mt-2 text-center">{error}</p>
+                            )}
                         </div>
                     </div>
                 );
