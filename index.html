@@ -53,69 +53,68 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
       }
 
       // ========================================
-      // SSO Authentication Layer (early registration)
-      // Must be in a regular <script> tag, NOT inside text/babel,
-      // because Babel standalone compiles async and the parent
-      // postMessage will arrive before the listener is ready.
+      // SSO Authentication Layer
+      // Registered early (plain <script>, not text/babel) so the
+      // postMessage listener is ready before the parent broadcasts.
+      // See SSO_INTEGRATION.md for the full protocol specification.
       // ========================================
+
+      // Trusted parent origins that may send admin-auth messages
       const ALLOWED_SSO_ORIGINS = [
           'https://arnoutzw.github.io',
           'https://zwartbol.industries'
       ];
 
-      // Shared SSO state (set via postMessage from parent portfolio)
-      window.__ssoUser = null;
-      window.__ssoIsAdmin = false;
-      window.__ssoListeners = new Set();
-      window.__notifySSO = function() {
-          window.__ssoListeners.forEach(function(fn) {
-              fn({ user: window.__ssoUser, isAdmin: window.__ssoIsAdmin });
-          });
+      // Global SSO state, readable from React via window.__sso
+      window.__sso = {
+          user: null,       // { uid, email, displayName, photoURL, idToken } | null
+          isAdmin: false,
+          listeners: new Set(),
+          notify: function() {
+              var snapshot = { user: window.__sso.user, isAdmin: window.__sso.isAdmin };
+              window.__sso.listeners.forEach(function(fn) { fn(snapshot); });
+          }
       };
 
-      // Listen for SSO credentials from parent portfolio
+      // Listen for SSO credentials from the parent portfolio
       window.addEventListener('message', async function(event) {
-          // Validate origin to prevent spoofed auth messages
-          if (!ALLOWED_SSO_ORIGINS.includes(event.origin)) {
-              return;
-          }
+          if (!ALLOWED_SSO_ORIGINS.includes(event.origin)) return;
 
           var data = event.data;
           if (!data || data.type !== 'admin-auth') return;
 
-          window.__ssoIsAdmin = !!data.isAdmin;
+          window.__sso.isAdmin = !!data.isAdmin;
 
           if (data.sso && data.sso.idToken) {
-              window.__ssoUser = {
+              window.__sso.user = {
                   uid: data.sso.uid,
                   email: data.sso.email,
                   displayName: data.sso.displayName,
                   photoURL: data.sso.photoURL,
-                  idToken: data.sso.idToken,
+                  idToken: data.sso.idToken
               };
-
-              // Sign in to Firebase Auth using the SSO credential
+              // Authenticate with Firebase so Firestore operations are allowed
               if (firebaseAuth) {
                   try {
                       var credential = firebase.auth.GoogleAuthProvider.credential(data.sso.idToken);
                       await firebaseAuth.signInWithCredential(credential);
                   } catch (err) {
-                      console.warn('Firebase SSO sign-in failed:', err.message);
+                      console.warn('SSO sign-in failed:', err.message);
                   }
               }
           } else {
-              window.__ssoUser = null;
+              // User signed out in the parent
+              window.__sso.user = null;
               if (firebaseAuth) {
                   try { await firebaseAuth.signOut(); } catch (e) {}
               }
           }
 
-          window.__notifySSO();
+          window.__sso.notify();
       });
 
-      // Tell the parent we're ready to receive SSO credentials.
-      // This handles the race condition where the parent sent the
-      // message before this iframe's listener was registered.
+      // Signal readiness so the parent can re-send credentials
+      // (handles the race where the parent sent before we loaded)
       if (window.parent !== window) {
           window.parent.postMessage({ type: 'sso-ready', app: 'lab-inventory' }, '*');
       }
@@ -339,10 +338,28 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         const STORAGE_KEY = 'arnout-lab-inventory-v2';
         const SETTINGS_KEY = 'arnout-lab-settings';
 
-        // SSO state accessors (actual listener is in the early <script> tag above)
-        const getSSOUser = () => window.__ssoUser;
-        const getSSOIsAdmin = () => window.__ssoIsAdmin;
-        const ssoListeners = window.__ssoListeners;
+        // SSO accessors (actual listener is in the early <script> tag above)
+        const getSSOUser = () => window.__sso.user;
+        const getSSOIsAdmin = () => window.__sso.isAdmin;
+
+        // React hook for subscribing to SSO state changes
+        const useSSO = () => {
+            const [ssoState, setSSOState] = useState({
+                user: getSSOUser(),
+                isAdmin: getSSOIsAdmin()
+            });
+            useEffect(() => {
+                const onAuth = (snapshot) => setSSOState({ ...snapshot });
+                window.__sso.listeners.add(onAuth);
+                // Sync in case SSO arrived before React mounted
+                const current = getSSOUser();
+                if (current && !ssoState.user) {
+                    setSSOState({ user: current, isAdmin: getSSOIsAdmin() });
+                }
+                return () => window.__sso.listeners.delete(onAuth);
+            }, []);
+            return ssoState;
+        };
         // IndexedDB Helper for persistent storage with photo support
 
         // App version info
@@ -739,6 +756,32 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             }
         };
 
+        // Per-user data in Firestore (see SSO_INTEGRATION.md)
+        const saveUserData = async (key, value) => {
+            const user = getSSOUser();
+            if (!isFirestoreReady() || !user) return;
+            try {
+                await firestore.collection('users').doc(user.uid)
+                    .collection('app_data').doc(key)
+                    .set(value, { merge: true });
+            } catch (err) {
+                console.error('saveUserData failed:', err);
+            }
+        };
+
+        const loadUserData = async (key) => {
+            const user = getSSOUser();
+            if (!isFirestoreReady() || !user) return null;
+            try {
+                const doc = await firestore.collection('users').doc(user.uid)
+                    .collection('app_data').doc(key).get();
+                return doc.exists ? doc.data() : null;
+            } catch (err) {
+                console.warn('loadUserData failed:', err);
+                return null;
+            }
+        };
+
         // 12NC Code generator (Philips format: XXYY ZZZ ZZZZZ)
         const generateNC = (category, existingItems) => {
             const groups = { 'Electronics': '48', '3D Printing': '40', 'Mechanical': '24', 'Other': '53' };
@@ -1008,16 +1051,16 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                 )}
                             </div>
                             <hr className="border-zinc-800"/>
-                            {getSSOUser() && (
+                            {(() => { const u = getSSOUser(); return u && (
                                 <div className="bg-zinc-800 border border-zinc-700 p-3 rounded-lg flex items-center gap-3">
-                                    {getSSOUser().photoURL && <img src={getSSOUser().photoURL} alt="" className="w-8 h-8 rounded-full border border-amber-500/30" />}
+                                    {u.photoURL && <img src={u.photoURL} alt="" className="w-8 h-8 rounded-full border border-amber-500/30" />}
                                     <div>
-                                        <div className="text-sm text-zinc-200 font-mono">{getSSOUser().displayName || 'User'}</div>
-                                        <div className="text-xs text-zinc-500 font-mono">{getSSOUser().email}</div>
+                                        <div className="text-sm text-zinc-200 font-mono">{u.displayName || u.email}</div>
+                                        <div className="text-xs text-zinc-500 font-mono">{u.email}</div>
                                     </div>
                                     <span className="ml-auto text-xs text-green-400 font-mono">SSO</span>
                                 </div>
-                            )}
+                            ); })()}
                             <hr className="border-zinc-800"/>
                             <button onClick={() => setShowAbout(!showAbout)} className="flex items-center gap-2 text-zinc-400 hover:text-amber-400 font-mono text-sm transition-colors w-full py-1">
                                 <span class="material-icons text-sm">info</span> About
@@ -1534,20 +1577,9 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         };
 
         const SSOGate = ({ children }) => {
-            const [authState, setAuthState] = useState({ user: getSSOUser(), isAdmin: getSSOIsAdmin() });
+            const { user } = useSSO();
 
-            useEffect(() => {
-                const listener = (state) => setAuthState({ ...state });
-                ssoListeners.add(listener);
-                // Check immediately in case SSO arrived before React mounted
-                const current = getSSOUser();
-                if (current && !authState.user) {
-                    setAuthState({ user: current, isAdmin: getSSOIsAdmin() });
-                }
-                return () => ssoListeners.delete(listener);
-            }, []);
-
-            if (!authState.user) {
+            if (!user) {
                 return (
                     <div className="min-h-screen flex items-center justify-center p-4">
                         <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-lg p-8 w-full max-w-sm">
