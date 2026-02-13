@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-title" content="Lab Inventory">
     <meta name="theme-color" content="#f59e0b">
     <!-- Content Security Policy - OWASP recommended security header -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app wss://*.firebaseio.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://unpkg.com https://cdn.tailwindcss.com https://www.gstatic.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; img-src 'self' data: blob:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.cloudfunctions.net https://*.firebasestorage.app wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'self'; form-action 'self';">
     <title>Electronics Lab Inventory</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
@@ -26,19 +26,31 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
     <script>
-      // Initialize Firebase
-      firebase.initializeApp({
-        apiKey: "AIzaSyAqRWVgti-CuXzr5AkhDKmPlu7iA2MQpUg",
-        authDomain: "arnout-s-homelab.firebaseapp.com",
-        projectId: "arnout-s-homelab",
-        storageBucket: "arnout-s-homelab.firebasestorage.app",
-        messagingSenderId: "258011834485",
-        appId: "1:258011834485:web:5afb1efaa303b4dd93f03c",
-        measurementId: "G-VXDKDLXP7L"
-      });
-      const firestore = firebase.firestore();
+      // Firebase config is injected at deploy time via environment-specific config.
+      // To set up: create a firebase-config.js that sets window.__FIREBASE_CONFIG__
+      // before this script runs, or replace these placeholders in your CI/CD pipeline.
+      const __fbConfig = window.__FIREBASE_CONFIG__ || {
+        apiKey: "",
+        authDomain: "",
+        projectId: "",
+        storageBucket: "",
+        messagingSenderId: "",
+        appId: ""
+      };
+
+      // Only initialize Firebase if config is provided
+      let firestore = null;
+      let firebaseAuth = null;
+      if (__fbConfig.apiKey) {
+        firebase.initializeApp(__fbConfig);
+        firestore = firebase.firestore();
+        firebaseAuth = firebase.auth();
+      } else {
+        console.warn('Firebase config not provided. Running in offline-only mode.');
+      }
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -258,15 +270,64 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         };
         const STORAGE_KEY = 'arnout-lab-inventory-v2';
         const SETTINGS_KEY = 'arnout-lab-settings';
-        const AUTH_KEY = 'arnout-lab-auth';
 
-        // Simple hash function for password storage (client-side only)
-        const hashPassword = async (password) => {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(password);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-        };
+        // ========================================
+        // SSO Authentication Layer
+        // App is gated behind parent portfolio SSO.
+        // No SSO credentials = no access.
+        // ========================================
+        const ALLOWED_SSO_ORIGINS = [
+            'https://arnoutzw.github.io',
+            'https://zwartbol.industries'
+        ];
+
+        // Shared SSO state (set via postMessage from parent portfolio)
+        let ssoUser = null;
+        let ssoIsAdmin = false;
+
+        // SSO event listeners (components register callbacks here)
+        const ssoListeners = new Set();
+        const notifySSOListeners = () => ssoListeners.forEach(fn => fn({ user: ssoUser, isAdmin: ssoIsAdmin }));
+
+        // Listen for SSO credentials from parent portfolio
+        window.addEventListener('message', async (event) => {
+            // Validate origin to prevent spoofed auth messages
+            if (!ALLOWED_SSO_ORIGINS.includes(event.origin)) {
+                return;
+            }
+
+            const data = event.data;
+            if (!data || data.type !== 'admin-auth') return;
+
+            ssoIsAdmin = !!data.isAdmin;
+
+            if (data.sso && data.sso.idToken) {
+                ssoUser = {
+                    uid: data.sso.uid,
+                    email: data.sso.email,
+                    displayName: data.sso.displayName,
+                    photoURL: data.sso.photoURL,
+                    idToken: data.sso.idToken,
+                };
+
+                // Sign in to Firebase Auth using the SSO credential
+                if (firebaseAuth) {
+                    try {
+                        const credential = firebase.auth.GoogleAuthProvider.credential(data.sso.idToken);
+                        await firebaseAuth.signInWithCredential(credential);
+                    } catch (err) {
+                        console.warn('Firebase SSO sign-in failed:', err.message);
+                    }
+                }
+            } else {
+                ssoUser = null;
+                if (firebaseAuth) {
+                    try { await firebaseAuth.signOut(); } catch (e) {}
+                }
+            }
+
+            notifySSOListeners();
+        });
         // IndexedDB Helper for persistent storage with photo support
 
         // App version info
@@ -596,7 +657,18 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         // ========================================
         const FIRESTORE_DOC = 'lab-inventory/main';
 
+        // Guard: only allow Firestore operations when Firebase is configured and user is authenticated
+        const isFirestoreReady = () => {
+            if (!firestore) return false;
+            if (!firebaseAuth || !firebaseAuth.currentUser) {
+                console.warn('Firestore operation blocked: user not authenticated');
+                return false;
+            }
+            return true;
+        };
+
         const firestoreLoad = async () => {
+            if (!isFirestoreReady()) return null;
             try {
                 const doc = await firestore.doc(FIRESTORE_DOC).get();
                 if (doc.exists) {
@@ -614,10 +686,12 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             let timer = null;
             // Debounce writes: wait 1.5s after last change before pushing to Firestore
             return (boxes, items) => {
+                if (!isFirestoreReady()) return;
                 pending = { boxes, items, updatedAt: new Date().toISOString() };
                 if (timer) clearTimeout(timer);
                 timer = setTimeout(async () => {
                     if (!pending) return;
+                    if (!isFirestoreReady()) return;
                     const data = pending;
                     pending = null;
                     try {
@@ -631,6 +705,7 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         })();
 
         const firestoreSaveSettings = async (settings) => {
+            if (!isFirestoreReady()) return;
             try {
                 await firestore.doc('lab-inventory/settings').set(settings);
             } catch (err) {
@@ -639,6 +714,7 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
         };
 
         const firestoreLoadSettings = async () => {
+            if (!isFirestoreReady()) return null;
             try {
                 const doc = await firestore.doc('lab-inventory/settings').get();
                 return doc.exists ? doc.data() : null;
@@ -877,34 +953,6 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             const [form, setForm] = useState(settings);
             const [showAbout, setShowAbout] = useState(false);
             const [syncStatus, setSyncStatus] = useState(null);
-            const [showChangePassword, setShowChangePassword] = useState(false);
-            const [currentPw, setCurrentPw] = useState('');
-            const [newPw, setNewPw] = useState('');
-            const [confirmPw, setConfirmPw] = useState('');
-            const [pwMessage, setPwMessage] = useState(null);
-
-            const handleChangePassword = async () => {
-                setPwMessage(null);
-                const stored = localStorage.getItem(AUTH_KEY);
-                const currentHash = await hashPassword(currentPw);
-                if (currentHash !== stored) {
-                    setPwMessage({ type: 'error', text: 'Current password is incorrect' });
-                    return;
-                }
-                if (newPw.length < 4) {
-                    setPwMessage({ type: 'error', text: 'New password must be at least 4 characters' });
-                    return;
-                }
-                if (newPw !== confirmPw) {
-                    setPwMessage({ type: 'error', text: 'New passwords do not match' });
-                    return;
-                }
-                const newHash = await hashPassword(newPw);
-                localStorage.setItem(AUTH_KEY, newHash);
-                setPwMessage({ type: 'success', text: 'Password changed successfully' });
-                setCurrentPw(''); setNewPw(''); setConfirmPw('');
-                setTimeout(() => setShowChangePassword(false), 1500);
-            };
 
             const handleSyncPhotos = async () => {
                 if (!onSyncPhotos) return;
@@ -945,16 +993,14 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                 )}
                             </div>
                             <hr className="border-zinc-800"/>
-                            <button onClick={() => setShowChangePassword(!showChangePassword)} className="flex items-center gap-2 text-zinc-400 hover:text-amber-400 font-mono text-sm transition-colors w-full py-1">
-                                <span class="material-icons text-sm">lock</span> Change Password
-                            </button>
-                            {showChangePassword && (
-                                <div className="bg-zinc-800 border border-zinc-700 p-4 rounded-lg space-y-3">
-                                    <input type="password" value={currentPw} onChange={e => setCurrentPw(e.target.value)} placeholder="Current password" className="w-full px-4 py-2.5 rounded-lg text-sm border border-zinc-700" />
-                                    <input type="password" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="New password" className="w-full px-4 py-2.5 rounded-lg text-sm border border-zinc-700" />
-                                    <input type="password" value={confirmPw} onChange={e => setConfirmPw(e.target.value)} placeholder="Confirm new password" className="w-full px-4 py-2.5 rounded-lg text-sm border border-zinc-700" />
-                                    {pwMessage && <p className={`text-xs font-mono ${pwMessage.type === 'error' ? 'text-red-400' : 'text-green-400'}`}>{pwMessage.text}</p>}
-                                    <button onClick={handleChangePassword} className="w-full px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-zinc-900 rounded-lg text-sm font-mono font-bold transition-colors">Update Password</button>
+                            {ssoUser && (
+                                <div className="bg-zinc-800 border border-zinc-700 p-3 rounded-lg flex items-center gap-3">
+                                    {ssoUser.photoURL && <img src={ssoUser.photoURL} alt="" className="w-8 h-8 rounded-full border border-amber-500/30" />}
+                                    <div>
+                                        <div className="text-sm text-zinc-200 font-mono">{ssoUser.displayName || 'User'}</div>
+                                        <div className="text-xs text-zinc-500 font-mono">{ssoUser.email}</div>
+                                    </div>
+                                    <span className="ml-auto text-xs text-green-400 font-mono">SSO</span>
                                 </div>
                             )}
                             <hr className="border-zinc-800"/>
@@ -1228,36 +1274,12 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                                                     img.src = url;
                                                 });
 
-                                                // Try multiple CORS proxies as fallback
-                                                const loadViaProxy = async () => {
-                                                    const proxies = [
-                                                        (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-                                                        (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-                                                        (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
-                                                    ];
-                                                    for (const proxy of proxies) {
-                                                        try {
-                                                            const response = await fetch(proxy(url));
-                                                            if (response.ok) {
-                                                                const blob = await response.blob();
-                                                                if (blob.size > 0) return blob;
-                                                            }
-                                                        } catch (e) { console.log('Proxy failed:', e); }
-                                                    }
-                                                    throw new Error('All proxies failed');
-                                                };
-
                                                 try {
                                                     let blob;
                                                     try {
                                                         blob = await loadViaImage();
                                                     } catch (e1) {
-                                                        console.log('Direct load failed, trying proxy:', e1);
-                                                        try {
-                                                            blob = await loadViaProxy();
-                                                        } catch (e2) {
-                                                            throw new Error('CORS blocked - try downloading manually');
-                                                        }
+                                                        throw new Error('CORS blocked - try downloading the image manually and uploading it');
                                                     }
                                                     if (!blob.type.startsWith('image/') && blob.type !== '') {
                                                         throw new Error('Not an image');
@@ -1496,98 +1518,43 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             );
         };
 
-        const LoginScreen = ({ onLogin }) => {
-            const [password, setPassword] = useState('');
-            const [error, setError] = useState('');
-            const [isSettingUp, setIsSettingUp] = useState(false);
-            const [confirmPassword, setConfirmPassword] = useState('');
+        const SSOGate = ({ children }) => {
+            const [authState, setAuthState] = useState({ user: ssoUser, isAdmin: ssoIsAdmin });
 
             useEffect(() => {
-                const stored = localStorage.getItem(AUTH_KEY);
-                setIsSettingUp(!stored);
+                const listener = (state) => setAuthState({ ...state });
+                ssoListeners.add(listener);
+                return () => ssoListeners.delete(listener);
             }, []);
 
-            const handleSubmit = async (e) => {
-                e.preventDefault();
-                setError('');
-                const stored = localStorage.getItem(AUTH_KEY);
-
-                if (isSettingUp) {
-                    if (password.length < 4) {
-                        setError('Password must be at least 4 characters');
-                        return;
-                    }
-                    if (password !== confirmPassword) {
-                        setError('Passwords do not match');
-                        return;
-                    }
-                    const hash = await hashPassword(password);
-                    localStorage.setItem(AUTH_KEY, hash);
-                    onLogin();
-                } else {
-                    const hash = await hashPassword(password);
-                    if (hash === stored) {
-                        onLogin();
-                    } else {
-                        setError('Incorrect password');
-                        setPassword('');
-                    }
-                }
-            };
-
-            return (
-                <div className="min-h-screen flex items-center justify-center p-4">
-                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-lg p-8 w-full max-w-sm">
-                        <div className="text-center mb-6">
-                            <span className="material-icons text-amber-500" style={{fontSize: '48px'}}>inventory_2</span>
-                            <h1 className="text-xl font-mono font-bold text-zinc-100 mt-3">
-                                <span className="text-amber-500">$</span> lab_inventory
-                            </h1>
-                            <p className="text-xs text-zinc-500 font-mono mt-1">
-                                {isSettingUp ? 'Set up a password to protect your inventory' : 'Enter password to continue'}
-                            </p>
-                        </div>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-xs text-zinc-400 mb-1 font-mono">Password</label>
-                                <input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-100 focus:outline-none focus:border-amber-500 font-mono"
-                                    placeholder="••••••••"
-                                    autoFocus
-                                />
+            if (!authState.user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-4">
+                        <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-lg p-8 w-full max-w-sm">
+                            <div className="text-center mb-6">
+                                <span className="material-icons text-amber-500" style={{fontSize: '48px'}}>inventory_2</span>
+                                <h1 className="text-xl font-mono font-bold text-zinc-100 mt-3">
+                                    <span className="text-amber-500">$</span> lab_inventory
+                                </h1>
+                                <p className="text-xs text-zinc-500 font-mono mt-2">
+                                    Waiting for SSO authentication...
+                                </p>
+                                <p className="text-xs text-zinc-600 font-mono mt-1">
+                                    Sign in via the parent portfolio to access this app.
+                                </p>
                             </div>
-                            {isSettingUp && (
-                                <div>
-                                    <label className="block text-xs text-zinc-400 mb-1 font-mono">Confirm password</label>
-                                    <input
-                                        type="password"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="w-full px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-100 focus:outline-none focus:border-amber-500 font-mono"
-                                        placeholder="••••••••"
-                                    />
-                                </div>
-                            )}
-                            {error && (
-                                <p className="text-red-400 text-xs font-mono">{error}</p>
-                            )}
-                            <button
-                                type="submit"
-                                className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-zinc-900 font-bold rounded-lg transition font-mono"
-                            >
-                                {isSettingUp ? 'Set Password & Enter' : 'Unlock'}
-                            </button>
-                        </form>
+                            <div className="flex justify-center">
+                                <span className="material-icons text-zinc-600 animate-spin" style={{fontSize: '24px'}}>sync</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            );
+                );
+            }
+
+            return children;
         };
 
         const App = () => {
-            const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [loading, setLoading] = useState(true);
             const [boxes, setBoxes] = useState([]);
             const [items, setItems] = useState([]);
@@ -1815,25 +1782,6 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                     img.src = url;
                 });
 
-                // Helper to load via multiple CORS proxies
-                const loadViaProxy = async (url) => {
-                    const proxies = [
-                        (u) => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
-                        (u) => `https://corsproxy.io/?${encodeURIComponent(u)}`,
-                        (u) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`
-                    ];
-                    for (const proxy of proxies) {
-                        try {
-                            const response = await fetch(proxy(url));
-                            if (response.ok) {
-                                const blob = await response.blob();
-                                if (blob.size > 0) return blob;
-                            }
-                        } catch (e) { /* try next */ }
-                    }
-                    throw new Error('All proxies failed');
-                };
-
                 for (let i = 0; i < itemsWithImages.length; i++) {
                     const item = itemsWithImages[i];
                     onProgress({ current: i + 1, total, success, failed, skipped });
@@ -1846,16 +1794,12 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
                             continue;
                         }
 
-                        // Try loading image with fallbacks
+                        // Try loading image directly (no third-party proxy to avoid data leaks)
                         let blob;
                         try {
                             blob = await loadViaImage(item.image);
                         } catch (e1) {
-                            try {
-                                blob = await loadViaProxy(item.image);
-                            } catch (e2) {
-                                throw new Error('CORS blocked');
-                            }
+                            throw new Error('CORS blocked - download manually');
                         }
 
                         if (!blob.type.startsWith('image/') && blob.type !== '') {
@@ -2455,7 +2399,7 @@ window.INVENTORY_DATABASE = {"version": "1.0", "created": "2026-01-31", "stats":
             );
         };
 
-        ReactDOM.render(<App />, document.getElementById('root'));
+        ReactDOM.render(<SSOGate><App /></SSOGate>, document.getElementById('root'));
 
         // Register Service Worker with auto-update
         if ('serviceWorker' in navigator) {

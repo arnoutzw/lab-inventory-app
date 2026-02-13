@@ -85,34 +85,30 @@ If your child PWA has its own Firebase Firestore instance (sharing the same Fire
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
 <script>
-  // Initialize with the SAME Firebase config as the parent
-  const firebaseApp = firebase.initializeApp({
-    apiKey: "AIzaSyAqRWVgti-CuXzr5AkhDKmPlu7iA2MQpUg",
-    authDomain: "arnout-s-homelab.firebaseapp.com",
-    projectId: "arnout-s-homelab",
-    storageBucket: "arnout-s-homelab.firebasestorage.app",
-    messagingSenderId: "258011834485",
-    appId: "1:258011834485:web:5afb1efaa303b4dd93f03c",
-  });
+  // IMPORTANT: Firebase config should be injected at deploy time, NOT hardcoded.
+  // Set window.__FIREBASE_CONFIG__ in a separate config file or CI/CD pipeline.
+  const firebaseApp = firebase.initializeApp(window.__FIREBASE_CONFIG__);
   const db = firebaseApp.firestore();
   const auth = firebaseApp.auth();
 
+  // Allowed parent origins for SSO messages
+  const ALLOWED_ORIGINS = ['https://your-portfolio-domain.example.com'];
+
   // Listen for SSO credentials from parent
   window.addEventListener('message', async (event) => {
+    // SECURITY: Always validate the origin of postMessage events
+    if (!ALLOWED_ORIGINS.includes(event.origin)) return;
+
     const data = event.data;
     if (!data || data.type !== 'admin-auth') return;
 
     if (data.sso && data.sso.idToken) {
-      // The child PWA shares the same Firebase project, so the user's
-      // auth state will automatically be available if the parent and child
-      // share the same auth domain. However, since iframes are on different
-      // origins (github.io subpaths), we use signInWithCredential:
       try {
         const credential = firebase.auth.GoogleAuthProvider.credential(data.sso.idToken);
         await auth.signInWithCredential(credential);
         console.log('Signed in via parent SSO');
       } catch (err) {
-        console.warn('SSO sign-in failed, using token for display only:', err.message);
+        console.warn('SSO sign-in failed:', err.message);
       }
     } else {
       // User signed out
@@ -173,15 +169,21 @@ function onUserSignedIn(user) {
 1. **Never trust `isAdmin` blindly** on the client side. Use it for UI toggling only. Sensitive operations should verify the ID token server-side.
 2. **ID tokens expire** after ~1 hour. The parent refreshes and re-sends tokens automatically when the iframe loads or auth state changes.
 3. The `key` field (admin password) is provided for **backward compatibility** with apps that used the old password-based auth. New apps should use the `sso` object instead.
-4. Always validate the `event.origin` in production if you want to restrict which parent can send auth messages.
+4. **Always validate `event.origin`** in the `message` event handler. Only accept auth messages from known parent origins.
+5. **Never hardcode Firebase API keys** in source code or documentation. Use environment-specific configuration injected at deploy time (e.g., `window.__FIREBASE_CONFIG__`).
+6. **Gate all Firestore operations** behind Firebase Auth — only allow reads/writes when `firebase.auth().currentUser` is set.
+7. **Avoid third-party CORS proxies** for fetching external resources. They can log and inspect all traffic routed through them.
 
 ---
 
 ## Quick Checklist for Adding SSO to a Child PWA
 
 - [ ] Add `window.addEventListener('message', ...)` listener for `admin-auth` messages
+- [ ] **Validate `event.origin`** against an allowlist of trusted parent domains
 - [ ] Extract `sso` object for user identity (uid, email, displayName, photoURL)
-- [ ] Use `idToken` if you need authenticated Firestore access
+- [ ] Use `idToken` with `signInWithCredential` for authenticated Firestore access
+- [ ] **Gate all Firestore operations** behind `firebase.auth().currentUser` check
+- [ ] **Inject Firebase config at deploy time** — never commit API keys to source control
 - [ ] Update UI to show/hide user-specific features based on auth state
 - [ ] Store per-user data under `/users/{uid}/app_data/` in Firestore
 - [ ] Test sign-in and sign-out flows by toggling auth in the parent portfolio
